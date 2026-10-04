@@ -54,6 +54,45 @@ extra-doc-files:    CHANGELOG.md
 common warnings
     ghc-options: -Wall
 
+
+library
+    import:           warnings
+    exposed-modules:
+        -- PostScript
+        PostScript.Types
+        PostScript.Environment
+        -- PostScript.Lexer
+        -- PostScript.Evaluator
+        PostScript.Primitives.Math
+        PostScript.Primitives.Stack
+        -- PostScript.Primitives.Dictionary
+        -- PostScript.Primitives.Control
+        -- PostScript.Primitives.Graphics.Path
+        -- PostScript.Primitives.Graphics.Transform
+        -- PostScript.Primitives.Graphics.State
+        -- PostScript.Primitives.Graphics.Render
+    hs-source-dirs:   src
+    build-depends:
+        base >= 4.14 && < 5,
+        containers,
+        mtl,
+        megaparsec
+    default-language: GHC2024
+
+test-suite postscript-interpreter-test
+    import:           warnings
+    default-language: GHC2024
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Spec.hs
+    build-depends:
+        base >= 4.14 && < 5,
+        postscript-interpreter,
+        containers,
+        mtl,
+        HUnit,
+        QuickCheck
+
 executable postscript-interpreter
     -- Import common warning flags.
     import:           warnings
@@ -68,8 +107,9 @@ executable postscript-interpreter
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base ^>=4.20.2.0
-
+    build-depends:    
+        base ^>=4.20.2.0,
+        postscript-interpreter
     -- Directories containing source files.
     hs-source-dirs:   app
 

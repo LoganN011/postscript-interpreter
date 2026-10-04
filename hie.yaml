@@ -1,0 +1,8 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:postscript-interpreter"
+    - path: "app"
+      component: "exe:postscript-interpreter"
+    - path: "test"
+      component: "test:postscript-interpreter-test"
