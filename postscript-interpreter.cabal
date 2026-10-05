@@ -65,7 +65,7 @@ library
         -- PostScript.Evaluator
         PostScript.Primitives.Math
         PostScript.Primitives.Stack
-        -- PostScript.Primitives.Dictionary
+        PostScript.Primitives.Dictionary
         -- PostScript.Primitives.Control
         -- PostScript.Primitives.Graphics.Path
         -- PostScript.Primitives.Graphics.Transform
