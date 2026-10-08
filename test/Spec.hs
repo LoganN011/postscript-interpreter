@@ -31,19 +31,30 @@
 
 module Main where
 
-import Control.Monad.State
+import Control.Monad.State (execStateT)
+import PostScript.Evaluator (defaultSystemDict, runInterpreter)
+import PostScript.Lexer (parsePostScript)
+import PostScript.Primitives.Math (psAdd, psDiv, psSub)
+import PostScript.Primitives.Stack (psDup, psExch, psRoll)
+import PostScript.Types (Interpreter, Object (..), PSState (..), initPSState)
 import Test.HUnit
-import PostScript.Types
-import PostScript.Environment ()
-import PostScript.Primitives.Stack
-import PostScript.Primitives.Math
+import Test.QuickCheck (Property, ioProperty, isSuccess, quickCheckResult)
 
 -- Helper to run an interpreter action on an initial stack
 runWithStack :: [Object] -> Interpreter a -> IO [Object]
 runWithStack initialStack action = do
-  let s0 = initPSState { operandStack = initialStack }
+  let s0 = initPSState {operandStack = initialStack}
   finalState <- execStateT action s0
   return (operandStack finalState)
+
+-- Helper to parse and evaluate a full PostScript string
+evalString :: String -> IO (Either String [Object])
+evalString code = case parsePostScript code of
+  Left err -> return (Left ("Parse error: " ++ err))
+  Right objs -> do
+    let s0 = initPSState {dictStack = [defaultSystemDict]}
+    res <- runInterpreter objs s0
+    return (fmap operandStack res)
 
 -- 1. Stack Tests
 testDup :: Test
@@ -83,19 +94,101 @@ testDivReal = TestCase $ do
   res <- runWithStack [PSInteger 2, PSInteger 7] psDiv
   assertEqual "div returns real" [PSReal 3.5] res
 
+-- 3. End-to-End Evaluator & Language Tests
+testArithmeticChain :: Test
+testArithmeticChain = TestCase $ do
+  -- (5 + 3) * 2 - 4 = 12
+  res <- evalString "5 3 add 2 mul 4 sub"
+  assertEqual "compound math expression" (Right [PSInteger 12]) res
+
+testVariables :: Test
+testVariables = TestCase $ do
+  res <- evalString "/x 10 def /y 25 def x y add"
+  assertEqual "variable definition and lookup" (Right [PSInteger 35]) res
+
+testProcedure :: Test
+testProcedure = TestCase $ do
+  res <- evalString "/square { dup mul } def 6 square"
+  assertEqual "procedure execution" (Right [PSInteger 36]) res
+
+testIfTrue :: Test
+testIfTrue = TestCase $ do
+  res <- evalString "true { 42 } if"
+  assertEqual "if executes block when true" (Right [PSInteger 42]) res
+
+testIfFalse :: Test
+testIfFalse = TestCase $ do
+  res <- evalString "false { 42 } if"
+  assertEqual "if skips block when false" (Right []) res
+
+testIfElse :: Test
+testIfElse = TestCase $ do
+  res <- evalString "10 20 lt { 1 } { 2 } ifelse"
+  assertEqual "ifelse branches correctly" (Right [PSInteger 1]) res
+
+testRepeat :: Test
+testRepeat = TestCase $ do
+  -- 1 * 2^4 = 16
+  res <- evalString "1 4 { 2 mul } repeat"
+  assertEqual "repeat loop" (Right [PSInteger 16]) res
+
+testForLoop :: Test
+testForLoop = TestCase $ do
+  -- 0 + 1 + 2 + 3 + 4 + 5 = 15
+  res <- evalString "0 1 1 5 { add } for"
+  assertEqual "for loop summation" (Right [PSInteger 15]) res
+
+testStackUnderflow :: Test
+testStackUnderflow = TestCase $ do
+  res <- evalString "pop"
+  case res of
+    Left _ -> return ()
+    Right _ -> assertFailure "Expected stack underflow error"
+
+testUndefinedSymbol :: Test
+testUndefinedSymbol = TestCase $ do
+  res <- evalString "nonExistentSymbol"
+  case res of
+    Left _ -> return ()
+    Right _ -> assertFailure "Expected undefined symbol error"
+
+-- 4. QuickCheck Properties
+-- Invariant: 'x dup pop' leaves 'x' on the stack
+prop_dupPop :: Int -> Property
+prop_dupPop n = ioProperty $ do
+  res <- evalString (show n ++ " dup pop")
+  return (res == Right [PSInteger n])
+
+-- Test Registry
 tests :: Test
-tests = TestList
-  [ TestLabel "testDup" testDup
-  , TestLabel "testExch" testExch
-  , TestLabel "testRoll" testRoll
-  , TestLabel "testAddInt" testAddInt
-  , TestLabel "testSub" testSub
-  , TestLabel "testDivReal" testDivReal
-  ]
+tests =
+  TestList
+    [ -- Unit tests for primitives
+      TestLabel "testDup" testDup,
+      TestLabel "testExch" testExch,
+      TestLabel "testRoll" testRoll,
+      TestLabel "testAddInt" testAddInt,
+      TestLabel "testSub" testSub,
+      TestLabel "testDivReal" testDivReal,
+      -- End-to-end evaluator tests
+      TestLabel "testArithmeticChain" testArithmeticChain,
+      TestLabel "testVariables" testVariables,
+      TestLabel "testProcedure" testProcedure,
+      TestLabel "testIfTrue" testIfTrue,
+      TestLabel "testIfFalse" testIfFalse,
+      TestLabel "testIfElse" testIfElse,
+      TestLabel "testRepeat" testRepeat,
+      TestLabel "testForLoop" testForLoop,
+      TestLabel "testStackUnderflow" testStackUnderflow,
+      TestLabel "testUndefinedSymbol" testUndefinedSymbol
+    ]
 
 main :: IO ()
 main = do
+  putStrLn "=== Running HUnit Test Suite ==="
   counts <- runTestTT tests
-  if errors counts + failures counts > 0
-    then error "Tests failed!"
-    else putStrLn "All primitive tests passed!"
+  putStrLn "\n=== Running QuickCheck Properties ==="
+  qcResult <- quickCheckResult prop_dupPop
+  if errors counts + failures counts > 0 || not (isSuccess qcResult)
+    then error "One or more tests failed!"
+    else putStrLn "All tests passed successfully!"

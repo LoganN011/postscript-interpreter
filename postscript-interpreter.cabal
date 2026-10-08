@@ -62,7 +62,7 @@ library
         PostScript.Types
         PostScript.Environment
         PostScript.Lexer
-        -- PostScript.Evaluator
+        PostScript.Evaluator
         PostScript.Primitives.Math
         PostScript.Primitives.Stack
         PostScript.Primitives.Dictionary
