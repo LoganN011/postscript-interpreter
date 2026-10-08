@@ -30,7 +30,6 @@
 module PostScript.Primitives.Control where
 
 import Control.Monad (replicateM_, when)
-import Control.Monad.State
 import PostScript.Environment (pop, push)
 import PostScript.Types
 
