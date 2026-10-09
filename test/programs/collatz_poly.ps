@@ -1,0 +1,46 @@
+% ==============================================================================
+% Collatz Sequence & Polynomial Evaluation in PostScript
+% Computes Collatz sequence lengths and evaluates polynomials using Horner's rule.
+% ==============================================================================
+
+% Collatz steps: counts iterations to reach 1
+/collatz_steps {
+    /val exch def
+    /steps 0 def
+    1 1 200 {
+        pop
+        val 1 gt {
+            val 2 mod 0 eq
+                { /val val 2 idiv def }
+                { /val val 3 mul 1 add def }
+            ifelse
+            /steps steps 1 add def
+        } if
+    } for
+    steps
+} def
+
+% Horner's rule for polynomial: a*x^3 + b*x^2 + c*x + d
+% Stack args: x a b c d
+/eval_poly3 {
+    /d exch def
+    /c exch def
+    /b exch def
+    /a exch def
+    /x exch def
+
+    a x mul b add
+    x mul c add
+    x mul d add
+} def
+
+% 1. Collatz steps for 6 -> 8
+6 collatz_steps
+
+% 2. Collatz steps for 27 -> 111
+27 collatz_steps
+
+% 3. Polynomial evaluation: 2*(3)^3 - 4*(3)^2 + 3*(3) - 5 = 22
+3 2 -4 3 -5 eval_poly3
+
+% Stack contains (top to bottom): [22, 111, 8]

@@ -152,7 +152,36 @@ testUndefinedSymbol = TestCase $ do
     Left _ -> return ()
     Right _ -> assertFailure "Expected undefined symbol error"
 
--- 4. QuickCheck Properties
+-- Helper to execute a full .ps script file from disk and return its operand stack
+evalScriptFile :: FilePath -> IO (Either String [Object])
+evalScriptFile path = do
+  content <- readFile path
+  res <- evalString content
+  return res
+
+-- 4. Large PostScript File Execution Tests
+testFibonacciScript :: Test
+testFibonacciScript = TestCase $ do
+  res <- evalScriptFile "test/programs/fibonacci.ps"
+  assertEqual "fibonacci and lucas verification"
+    (Right [PSBoolean True, PSInteger 33, PSInteger 55])
+    res
+
+testPrimesScript :: Test
+testPrimesScript = TestCase $ do
+  res <- evalScriptFile "test/programs/primes.ps"
+  assertEqual "prime sieve and summation"
+    (Right [PSBoolean False, PSBoolean True, PSInteger 129, PSInteger 10])
+    res
+
+testCollatzPolyScript :: Test
+testCollatzPolyScript = TestCase $ do
+  res <- evalScriptFile "test/programs/collatz_poly.ps"
+  assertEqual "collatz steps and polynomial evaluation"
+    (Right [PSInteger 22, PSInteger 111, PSInteger 8])
+    res
+
+-- 5. QuickCheck Properties
 -- Invariant: 'x dup pop' leaves 'x' on the stack
 prop_dupPop :: Int -> Property
 prop_dupPop n = ioProperty $ do
@@ -180,7 +209,11 @@ tests =
       TestLabel "testRepeat" testRepeat,
       TestLabel "testForLoop" testForLoop,
       TestLabel "testStackUnderflow" testStackUnderflow,
-      TestLabel "testUndefinedSymbol" testUndefinedSymbol
+      TestLabel "testUndefinedSymbol" testUndefinedSymbol,
+      -- File-based large program tests
+      TestLabel "testFibonacciScript" testFibonacciScript,
+      TestLabel "testPrimesScript" testPrimesScript,
+      TestLabel "testCollatzPolyScript" testCollatzPolyScript
     ]
 
 main :: IO ()

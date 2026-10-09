@@ -1,0 +1,50 @@
+% ==============================================================================
+% Fibonacci & Lucas Numbers in PostScript
+% Calculates Fibonacci sequence recursively and iteratively,
+% verifies Lucas numbers, and tests mathematical identity F(2n) = F(n) * L(n).
+% ==============================================================================
+
+% Recursive Fibonacci implementation
+/fib_rec {
+    dup 1 le
+        { }
+        { dup 1 sub fib_rec exch 2 sub fib_rec add }
+    ifelse
+} def
+
+% Lucas number generator: L(0) = 2, L(1) = 1, L(n) = L(n-1) + L(n-2)
+/lucas {
+    dup 0 eq
+        { pop 2 }
+        {
+            dup 1 eq
+                { pop 1 }
+                { dup 1 sub lucas exch 2 sub lucas add }
+            ifelse
+        }
+    ifelse
+} def
+
+% Iterative summation of first N Fibonacci numbers
+% sum_fib(N) = sum_{i=0..N} fib_rec(i)
+/sum_fib {
+    /n exch def
+    0
+    0 1 n {
+        fib_rec add
+    } for
+} def
+
+% 1. Test fib_rec(10): should be 55
+10 fib_rec
+
+% 2. Test sum of first 7 Fibonacci numbers (0, 1, 1, 2, 3, 5, 8, 13) -> 33
+7 sum_fib
+
+% 3. Verify identity: F(2*n) == F(n) * L(n) for n = 4
+% F(4) = 3, L(4) = 7, F(8) = 21, 3 * 7 = 21
+4 fib_rec 4 lucas mul
+8 fib_rec
+eq
+
+% End of program: stack contains [55, 33, true] with top = true

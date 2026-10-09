@@ -1,0 +1,75 @@
+% ==============================================================================
+% Prime Number Sieve & Primality Testing in PostScript
+% Implements trial division, counts primes in a range, and sums primes.
+% ==============================================================================
+
+% Check if a number is prime
+/is_prime {
+    /num exch def
+    num 2 lt
+        { false }
+        {
+            num 2 eq
+                { true }
+                {
+                    num 2 mod 0 eq
+                        { false }
+                        {
+                            /res true def
+                            % Check odd divisors from 3 up to num
+                            3 2 num {
+                                /d exch def
+                                d d mul num le {
+                                    num d mod 0 eq {
+                                        /res false def
+                                    } if
+                                } if
+                            } for
+                            res
+                        }
+                    ifelse
+                }
+            ifelse
+        }
+    ifelse
+} def
+
+% Count primes in range [2 .. max_val]
+/count_primes {
+    /max_val exch def
+    /cnt 0 def
+    2 1 max_val {
+        is_prime {
+            /cnt cnt 1 add def
+        } if
+    } for
+    cnt
+} def
+
+% Sum of primes in range [2 .. limit]
+/sum_primes {
+    /limit exch def
+    /total 0 def
+    2 1 limit {
+        /p exch def
+        p is_prime {
+            /total total p add def
+        } if
+    } for
+    total
+} def
+
+% 1. Count primes under 30:
+% Primes are 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 -> 10 primes
+30 count_primes
+
+% 2. Sum of primes under 30:
+% 2 + 3 + 5 + 7 + 11 + 13 + 17 + 19 + 23 + 29 = 129
+30 sum_primes
+
+% 3. Primality check for large primes:
+% 97 is prime (true), 100 is not prime (false)
+97 is_prime
+100 is_prime
+
+% Stack contains (top to bottom): [false, true, 129, 10]
