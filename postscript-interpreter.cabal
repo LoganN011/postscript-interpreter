@@ -58,7 +58,7 @@ common warnings
 library
     import:           warnings
     exposed-modules:
-        -- PostScript
+        PostScript
         PostScript.Types
         PostScript.Environment
         PostScript.Lexer
