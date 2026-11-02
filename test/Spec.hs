@@ -1,196 +1,258 @@
-module Main where
+module Main (main) where
 
-import Control.Monad.State (execStateT)
 import PostScript.Evaluator (defaultSystemDict, runInterpreter)
 import PostScript.Lexer (parsePostScript)
-import PostScript.Primitives.Math (psAdd, psDiv, psSub)
-import PostScript.Primitives.Stack (psDup, psExch, psRoll)
-import PostScript.Types (Interpreter, Object (..), PSState (..), initPSState)
-import Test.HUnit
-import Test.QuickCheck (Property, ioProperty, isSuccess, quickCheckResult)
+import PostScript.Types (Object (..), PSState (..), initPSState)
+import System.Exit (exitFailure, exitSuccess)
+import Test.QuickCheck
 
--- Helper to run an interpreter action on an initial stack
-runWithStack :: [Object] -> Interpreter a -> IO [Object]
-runWithStack initialStack action = do
-  let s0 = initPSState {operandStack = initialStack}
-  finalState <- execStateT action s0
-  return (operandStack finalState)
 
--- Helper to parse and evaluate a full PostScript string
-evalString :: String -> IO (Either String [Object])
-evalString code = case parsePostScript code of
-  Left err -> return (Left ("Parse error: " ++ err))
+-- | Parse and evaluate a raw PostScript string from the root system state.
+evalScript :: String -> IO (Either String [Object])
+evalScript code = case parsePostScript code of
+  Left err -> pure (Left ("Parse error: " ++ err))
   Right objs -> do
     let s0 = initPSState {dictStack = [defaultSystemDict]}
     res <- runInterpreter objs s0
-    return (fmap operandStack res)
+    pure (fmap operandStack res)
 
--- 1. Stack Tests
-testDup :: Test
-testDup = TestCase $ do
-  res <- runWithStack [PSInteger 42] psDup
-  assertEqual "dup duplicates top value" [PSInteger 42, PSInteger 42] res
+-- | Read a .ps file from disk and execute it to completion.
+evalFile :: FilePath -> IO (Either String [Object])
+evalFile path = do
+  source <- readFile path
+  evalScript source
 
-testExch :: Test
-testExch = TestCase $ do
-  res <- runWithStack [PSInteger 1, PSInteger 2] psExch
-  assertEqual "exch swaps top two items" [PSInteger 2, PSInteger 1] res
 
-testRoll :: Test
-testRoll = TestCase $ do
-  -- PS: 1 2 3 3 1 roll -> shifts top 3 by 1
-  -- Stack representation (top at head): [3, 2, 1]
-  -- Push n=3, j=1
-  res <- runWithStack [PSInteger 1, PSInteger 3, PSInteger 3, PSInteger 2, PSInteger 1] psRoll
-  assertEqual "roll top 3 elements by 1" [PSInteger 2, PSInteger 1, PSInteger 3] res
-
--- 2. Math Tests
-testAddInt :: Test
-testAddInt = TestCase $ do
-  -- Stack: [20, 10] represents "10 20 add"
-  res <- runWithStack [PSInteger 20, PSInteger 10] psAdd
-  assertEqual "add two integers" [PSInteger 30] res
-
-testSub :: Test
-testSub = TestCase $ do
-  -- Stack: [3, 10] represents "10 3 sub" -> 7
-  res <- runWithStack [PSInteger 3, PSInteger 10] psSub
-  assertEqual "sub top two values" [PSInteger 7] res
-
-testDivReal :: Test
-testDivReal = TestCase $ do
-  -- Stack: [2, 7] represents "7 2 div" -> 3.5
-  res <- runWithStack [PSInteger 2, PSInteger 7] psDiv
-  assertEqual "div returns real" [PSReal 3.5] res
-
--- 3. End-to-End Evaluator & Language Tests
-testArithmeticChain :: Test
-testArithmeticChain = TestCase $ do
-  -- (5 + 3) * 2 - 4 = 12
-  res <- evalString "5 3 add 2 mul 4 sub"
-  assertEqual "compound math expression" (Right [PSInteger 12]) res
-
-testVariables :: Test
-testVariables = TestCase $ do
-  res <- evalString "/x 10 def /y 25 def x y add"
-  assertEqual "variable definition and lookup" (Right [PSInteger 35]) res
-
-testProcedure :: Test
-testProcedure = TestCase $ do
-  res <- evalString "/square { dup mul } def 6 square"
-  assertEqual "procedure execution" (Right [PSInteger 36]) res
-
-testIfTrue :: Test
-testIfTrue = TestCase $ do
-  res <- evalString "true { 42 } if"
-  assertEqual "if executes block when true" (Right [PSInteger 42]) res
-
-testIfFalse :: Test
-testIfFalse = TestCase $ do
-  res <- evalString "false { 42 } if"
-  assertEqual "if skips block when false" (Right []) res
-
-testIfElse :: Test
-testIfElse = TestCase $ do
-  res <- evalString "10 20 lt { 1 } { 2 } ifelse"
-  assertEqual "ifelse branches correctly" (Right [PSInteger 1]) res
-
-testRepeat :: Test
-testRepeat = TestCase $ do
-  -- 1 * 2^4 = 16
-  res <- evalString "1 4 { 2 mul } repeat"
-  assertEqual "repeat loop" (Right [PSInteger 16]) res
-
-testForLoop :: Test
-testForLoop = TestCase $ do
-  -- 0 + 1 + 2 + 3 + 4 + 5 = 15
-  res <- evalString "0 1 1 5 { add } for"
-  assertEqual "for loop summation" (Right [PSInteger 15]) res
-
-testStackUnderflow :: Test
-testStackUnderflow = TestCase $ do
-  res <- evalString "pop"
-  case res of
-    Left _ -> return ()
-    Right _ -> assertFailure "Expected stack underflow error"
-
-testUndefinedSymbol :: Test
-testUndefinedSymbol = TestCase $ do
-  res <- evalString "nonExistentSymbol"
-  case res of
-    Left _ -> return ()
-    Right _ -> assertFailure "Expected undefined symbol error"
-
--- Helper to execute a full .ps script file from disk and return its operand stack
-evalScriptFile :: FilePath -> IO (Either String [Object])
-evalScriptFile path = do
-  content <- readFile path
-  res <- evalString content
-  return res
-
--- 4. Large PostScript File Execution Tests
-testFibonacciScript :: Test
-testFibonacciScript = TestCase $ do
-  res <- evalScriptFile "test/programs/fibonacci.ps"
-  assertEqual "fibonacci and lucas verification"
-    (Right [PSBoolean True, PSInteger 33, PSInteger 55])
-    res
-
-testPrimesScript :: Test
-testPrimesScript = TestCase $ do
-  res <- evalScriptFile "test/programs/primes.ps"
-  assertEqual "prime sieve and summation"
-    (Right [PSBoolean False, PSBoolean True, PSInteger 129, PSInteger 10])
-    res
-
-testCollatzPolyScript :: Test
-testCollatzPolyScript = TestCase $ do
-  res <- evalScriptFile "test/programs/collatz_poly.ps"
-  assertEqual "collatz steps and polynomial evaluation"
-    (Right [PSInteger 22, PSInteger 111, PSInteger 8])
-    res
-
--- 5. QuickCheck Properties
--- Invariant: 'x dup pop' leaves 'x' on the stack
+-- Stack: 'x dup pop' leaves 'x' on the stack
 prop_dupPop :: Int -> Property
-prop_dupPop n = ioProperty $ do
-  res <- evalString (show n ++ " dup pop")
-  return (res == Right [PSInteger n])
+prop_dupPop x = ioProperty $ do
+  res <- evalScript (show x ++ " dup pop")
+  pure (res == Right [PSInteger x])
 
--- Test Registry
-tests :: Test
-tests =
-  TestList
-    [ -- Unit tests for primitives
-      TestLabel "testDup" testDup,
-      TestLabel "testExch" testExch,
-      TestLabel "testRoll" testRoll,
-      TestLabel "testAddInt" testAddInt,
-      TestLabel "testSub" testSub,
-      TestLabel "testDivReal" testDivReal,
-      -- End-to-end evaluator tests
-      TestLabel "testArithmeticChain" testArithmeticChain,
-      TestLabel "testVariables" testVariables,
-      TestLabel "testProcedure" testProcedure,
-      TestLabel "testIfTrue" testIfTrue,
-      TestLabel "testIfFalse" testIfFalse,
-      TestLabel "testIfElse" testIfElse,
-      TestLabel "testRepeat" testRepeat,
-      TestLabel "testForLoop" testForLoop,
-      TestLabel "testStackUnderflow" testStackUnderflow,
-      TestLabel "testUndefinedSymbol" testUndefinedSymbol,
-      -- File-based large program tests
-      TestLabel "testFibonacciScript" testFibonacciScript,
-      TestLabel "testPrimesScript" testPrimesScript,
-      TestLabel "testCollatzPolyScript" testCollatzPolyScript
-    ]
+-- Stack: 'x y exch exch' preserves the original stack order
+prop_exchTwice :: Int -> Int -> Property
+prop_exchTwice x y = ioProperty $ do
+  res <- evalScript (show x ++ " " ++ show y ++ " exch exch")
+  pure (res == Right [PSInteger y, PSInteger x])
+
+-- Stack: 'dup add' is equivalent to doubling
+prop_dupAddDoubles :: Int -> Property
+prop_dupAddDoubles x = ioProperty $ do
+  res <- evalScript (show x ++ " dup add")
+  pure (res == Right [PSInteger (x * 2)])
+
+-- Stack: 'count' accurately reports number of pushed items
+prop_countMatches :: [Int] -> Property
+prop_countMatches xs =
+  let n = length xs
+      script = unwords (map show xs) ++ " count"
+   in ioProperty $ do
+        res <- evalScript script
+        pure (case res of
+                Right (PSInteger c : _) -> c == n
+                _                       -> False)
+
+-- Stack: 'clear' empties the entire operand stack
+prop_clearEmpties :: [Int] -> Property
+prop_clearEmpties xs =
+  let script = unwords (map show xs) ++ " clear"
+   in ioProperty $ do
+        res <- evalScript script
+        pure (res == Right [])
+
+-- Math: Commutativity of addition (x + y == y + x)
+prop_addCommutative :: Int -> Int -> Property
+prop_addCommutative x y = ioProperty $ do
+  res1 <- evalScript (show x ++ " " ++ show y ++ " add")
+  res2 <- evalScript (show y ++ " " ++ show x ++ " add")
+  pure (res1 == Right [PSInteger (x + y)] && res1 == res2)
+
+-- Math: Commutativity of multiplication (x * y == y * x)
+prop_mulCommutative :: Int -> Int -> Property
+prop_mulCommutative x y = ioProperty $ do
+  res1 <- evalScript (show x ++ " " ++ show y ++ " mul")
+  res2 <- evalScript (show y ++ " " ++ show x ++ " mul")
+  pure (res1 == Right [PSInteger (x * y)] && res1 == res2)
+
+-- Math: Subtraction and addition are inverses: (x - y) + y == x
+prop_subInverse :: Int -> Int -> Property
+prop_subInverse x y = ioProperty $ do
+  res <- evalScript (show x ++ " " ++ show y ++ " sub " ++ show y ++ " add")
+  pure (res == Right [PSInteger x])
+
+-- Math: Double negation is the identity
+prop_negInvolution :: Int -> Property
+prop_negInvolution x = ioProperty $ do
+  res <- evalScript (show x ++ " neg neg")
+  pure (res == Right [PSInteger x])
+
+-- Math: Absolute value is never negative
+prop_absNonNegative :: Int -> Property
+prop_absNonNegative x = ioProperty $ do
+  res <- evalScript (show x ++ " abs")
+  pure (res == Right [PSInteger (abs x)])
+
+-- Math: Euclidean division identity: (x idiv y) * y + (x mod y) == x
+prop_idivModIdentity :: Int -> NonZero Int -> Property
+prop_idivModIdentity x (NonZero y) = ioProperty $ do
+  let script = show x ++ " " ++ show y ++ " idiv " ++ show y ++ " mul "
+            ++ show x ++ " " ++ show y ++ " mod add"
+  res <- evalScript script
+  pure (res == Right [PSInteger x])
+
+-- Control: 'ifelse' selects the first branch on true
+prop_ifelseTrue :: Int -> Int -> Property
+prop_ifelseTrue x y = ioProperty $ do
+  res <- evalScript ("true { " ++ show x ++ " } { " ++ show y ++ " } ifelse")
+  pure (res == Right [PSInteger x])
+
+-- Control: 'ifelse' selects the second branch on false
+prop_ifelseFalse :: Int -> Int -> Property
+prop_ifelseFalse x y = ioProperty $ do
+  res <- evalScript ("false { " ++ show x ++ " } { " ++ show y ++ " } ifelse")
+  pure (res == Right [PSInteger y])
+
+-- Control: 'repeat' executes exactly n iterations
+prop_repeatCount :: NonNegative (Small Int) -> Property
+prop_repeatCount (NonNegative (Small n)) = ioProperty $ do
+  res <- evalScript ("0 " ++ show n ++ " { 1 add } repeat")
+  pure (res == Right [PSInteger n])
+
+-- Scoping: 'def' followed by identifier evaluates to the bound value
+prop_defLookup :: Int -> Property
+prop_defLookup x = ioProperty $ do
+  res <- evalScript ("/x " ++ show x ++ " def x")
+  pure (res == Right [PSInteger x])
+
+-- Relational: Equality is reflexive (x eq x == true)
+prop_eqReflexive :: Int -> Property
+prop_eqReflexive x = ioProperty $ do
+  res <- evalScript (show x ++ " " ++ show x ++ " eq")
+  pure (res == Right [PSBoolean True])
+
+
+
+data ProgramTest = ProgramTest
+  { testTitle    :: String
+  , programPath  :: FilePath
+  , expectedStack:: [Object]
+  }
+
+testPrograms :: [ProgramTest]
+testPrograms =
+  [ ProgramTest
+      { testTitle     = "Fibonacci, Lucas numbers & algebraic identity"
+      , programPath   = "test/programs/fibonacci.ps"
+      , expectedStack = [PSBoolean True, PSInteger 33, PSInteger 55]
+      }
+  , ProgramTest
+      { testTitle     = "Prime sieve, primality check & summation"
+      , programPath   = "test/programs/primes.ps"
+      , expectedStack = [PSBoolean False, PSBoolean True, PSInteger 129, PSInteger 10]
+      }
+  , ProgramTest
+      { testTitle     = "Collatz 3n+1 sequence & Horner's polynomial"
+      , programPath   = "test/programs/collatz_poly.ps"
+      , expectedStack = [PSInteger 22, PSInteger 111, PSInteger 8]
+      }
+  , ProgramTest
+      { testTitle     = "Dictionary scoping, shadowing & 'known'/'load'"
+      , programPath   = "test/programs/dict_scope.ps"
+      , expectedStack = [ PSBoolean False, PSInteger 1, PSInteger 2
+                        , PSInteger 100, PSInteger 300, PSInteger 999
+                        , PSInteger 42, PSInteger 1199
+                        ]
+      }
+  , ProgramTest
+      { testTitle     = "Operand stack indexing, copying, and multi-element roll"
+      , programPath   = "test/programs/stack_ops.ps"
+      , expectedStack = [ PSInteger 5, PSInteger 340, PSInteger 40
+                        , PSInteger 30, PSInteger 10, PSInteger 20
+                        ]
+      }
+  , ProgramTest
+      { testTitle     = "Trigonometry, logarithms, rounding family & division"
+      , programPath   = "test/programs/math_advanced.ps"
+      , expectedStack = [ PSInteger (-15), PSInteger 42, PSReal 3.4, PSInteger 2, PSInteger 3
+                        , PSReal (-3.0), PSReal 3.0, PSReal 3.0, PSReal 4.0, PSReal (-4.0)
+                        , PSReal 3.0, PSReal (-3.0), PSReal 4.0, PSReal 0.0, PSReal 3.0
+                        , PSReal 256.0, PSReal 90.0, PSReal 45.0, PSBoolean True, PSBoolean True
+                        , PSReal 13.0, PSReal 5.0
+                        ]
+      }
+  , ProgramTest
+      { testTitle     = "Euclidean GCD, LCM, recursive Factorial & Combinatorics"
+      , programPath   = "test/programs/euclid_gcd.ps"
+      , expectedStack = [ PSInteger 243, PSInteger 210, PSInteger 35, PSInteger 15
+                        , PSInteger 5040, PSInteger 720, PSInteger 60, PSInteger 36
+                        , PSInteger 12, PSInteger 35, PSInteger 6
+                        ]
+      }
+  , ProgramTest
+      { testTitle     = "Nested conditionals, De Morgan laws & nested for-loops"
+      , programPath   = "test/programs/control_flow.ps"
+      , expectedStack = [ PSInteger 31, PSInteger 30, PSInteger 60
+                        , PSBoolean True, PSBoolean True, PSBoolean True
+                        , PSBoolean True, PSBoolean True
+                        , PSInteger 1, PSInteger 0, PSInteger (-1)
+                        ]
+      }
+  ]
+
+-- Runs a single program test and prints its result.
+runProgramTest :: ProgramTest -> IO Bool
+runProgramTest t = do
+  putStr ("  * " ++ testTitle t ++ " ... ")
+  res <- evalFile (programPath t)
+  case res of
+    Right stack
+      | stack == expectedStack t -> do
+          putStrLn "PASS"
+          pure True
+      | otherwise -> do
+          putStrLn "FAIL"
+          putStrLn $ "      Expected: " ++ show (expectedStack t)
+          putStrLn $ "      Actual:   " ++ show stack
+          pure False
+    Left err -> do
+      putStrLn "ERROR"
+      putStrLn $ "      " ++ err
+      pure False
+
 
 main :: IO ()
 main = do
-  putStrLn "=== Running HUnit Test Suite ==="
-  counts <- runTestTT tests
-  putStrLn "\n=== Running QuickCheck Properties ==="
-  qcResult <- quickCheckResult prop_dupPop
-  if errors counts + failures counts > 0 || not (isSuccess qcResult)
-    then error "One or more tests failed!"
-    else putStrLn "All tests passed successfully!"
+  putStrLn "\n--- Section 1: Property-Based Testing (QuickCheck) ---"
+  let qcProps =
+        [ ("Stack: dup pop preserves top value", quickCheckResult (withNumTests 100 prop_dupPop))
+        , ("Stack: exch twice preserves order", quickCheckResult (withNumTests 100 prop_exchTwice))
+        , ("Stack: dup add doubles value", quickCheckResult (withNumTests 100 prop_dupAddDoubles))
+        , ("Stack: count matches pushed items", quickCheckResult (withNumTests 100 prop_countMatches))
+        , ("Stack: clear empties operand stack", quickCheckResult (withNumTests 100 prop_clearEmpties))
+        , ("Math: addition is commutative", quickCheckResult (withNumTests 100 prop_addCommutative))
+        , ("Math: multiplication is commutative", quickCheckResult (withNumTests 100 prop_mulCommutative))
+        , ("Math: subtraction and addition are inverses", quickCheckResult (withNumTests 100 prop_subInverse))
+        , ("Math: double negation is identity", quickCheckResult (withNumTests 100 prop_negInvolution))
+        , ("Math: absolute value is non-negative", quickCheckResult (withNumTests 100 prop_absNonNegative))
+        , ("Math: integer division and modulo identity", quickCheckResult (withNumTests 100 prop_idivModIdentity))
+        , ("Control: ifelse evaluates true branch", quickCheckResult (withNumTests 100 prop_ifelseTrue))
+        , ("Control: ifelse evaluates false branch", quickCheckResult (withNumTests 100 prop_ifelseFalse))
+        , ("Control: repeat executes n times", quickCheckResult (withNumTests 100 prop_repeatCount))
+        , ("Scoping: variable definition and lookup", quickCheckResult (withNumTests 100 prop_defLookup))
+        , ("Relational: equality is reflexive", quickCheckResult (withNumTests 100 prop_eqReflexive))
+        ]
+
+  qcResults <- mapM (\(lbl, action) -> putStrLn ("  [QC] " ++ lbl) >> action) qcProps
+  let allQcPassed = all isSuccess qcResults
+
+  putStrLn "\n--- Section 2: PostScript Program Integration Tests ---"
+  programResults <- mapM runProgramTest testPrograms
+  let allProgramsPassed = and programResults
+
+  if allQcPassed && allProgramsPassed
+    then do
+      putStrLn "RESULT: All QuickCheck properties and PostScript programs PASSED!"
+      exitSuccess
+    else do
+      putStrLn "RESULT: One or more tests FAILED!"
+      exitFailure

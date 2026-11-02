@@ -1,0 +1,56 @@
+% ==============================================================================
+% Advanced Mathematics & Numeric Operators in PostScript
+% Tests trigonometry (sin, cos, atan), exponential/log (exp, ln, log),
+% square root (sqrt), rounding (ceiling, floor, round, truncate), and division.
+% ==============================================================================
+
+% 1. Euclidean Distance / Hypotenuse using sqrt
+/hypot {
+    dup mul exch dup mul add sqrt
+} def
+
+3 4 hypot        % 5.0
+5 12 hypot       % 13.0
+
+% 2. Trigonometric Identity: sin^2(x) + cos^2(x) == 1
+% Input in degrees
+/trig_identity {
+    /deg exch def
+    deg sin dup mul
+    deg cos dup mul
+    add
+    % Check if within 0.0001 of 1.0
+    1.0 sub abs 0.0001 lt
+} def
+
+45 trig_identity   % true
+75 trig_identity   % true
+
+% 3. Arctangent: angle in degrees [0, 360) for (y, x)
+1 1 atan         % 45.0
+1 0 atan         % 90.0
+
+% 4. Exponentials and Logarithms
+2 8 exp          % 2^8 = 256.0
+1000 log round   % log10(1000) = 3.0
+1 ln             % ln(1) = 0.0
+
+% 5. Rounding Family on positive and negative numbers
+3.7 ceiling      % 4.0
+-3.7 ceiling     % -3.0
+3.7 floor        % 3.0
+-3.7 floor       % -4.0
+3.7 round        % 4.0
+3.2 round        % 3.0
+3.7 truncate     % 3.0
+-3.7 truncate    % -3.0
+
+% 6. Integer division, remainder, and negation
+17 5 idiv        % 3
+17 5 mod         % 2
+17 5 div         % 3.4
+-42 abs          % 42
+15 neg           % -15
+
+% Final operand stack top to bottom:
+% [-15, 42, 3.4, 2, 3, -3.0, 3.0, 3.0, 4.0, -4.0, 3.0, -3.0, 4.0, 0.0, 3.0, 256.0, 90.0, 45.0, true, true, 13.0, 5.0]

@@ -1,0 +1,72 @@
+% ==============================================================================
+% Number-Theoretic Algorithms & Combinatorics in PostScript
+% Implements Euclidean GCD, LCM, recursive Factorial, and Binomial Coefficients.
+% ==============================================================================
+
+% 1. Greatest Common Divisor (Euclidean algorithm)
+/gcd {
+    dup 0 eq
+        { pop }
+        { exch 1 index mod gcd }
+    ifelse
+} def
+
+% 2. Least Common Multiple
+/lcm {
+    /b exch def
+    /a exch def
+    a b mul
+    a b gcd
+    idiv
+} def
+
+% 3. Recursive Factorial
+/factorial {
+    dup 1 le
+        { pop 1 }
+        { dup 1 sub factorial mul }
+    ifelse
+} def
+
+% 4. Binomial Coefficient: nCr = n! / (k! * (n - k)!)
+/nCr {
+    /k exch def
+    /n exch def
+    n factorial
+    k factorial
+    n k sub factorial
+    mul
+    idiv
+} def
+
+% 5. Iterative integer power: base^exp using repeat
+/int_power {
+    /exp exch def
+    /base exch def
+    /ans 1 def
+    exp {
+        /ans ans base mul def
+    } repeat
+    ans
+} def
+
+% Run test cases:
+54 24 gcd        % 6
+105 35 gcd       % 35
+48 180 gcd       % 12
+
+12 18 lcm        % 36
+15 20 lcm        % 60
+
+6 factorial      % 720
+7 factorial      % 5040
+
+6 2 nCr          % 15
+7 3 nCr          % 35
+10 4 nCr         % 210
+
+3 5 int_power    % 3^5 = 243
+
+% Final operand stack top to bottom:
+% [243, 210, 35, 15, 5040, 720, 60, 36, 12, 35, 6]
+

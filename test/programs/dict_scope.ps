@@ -1,0 +1,50 @@
+% ==============================================================================
+% Dictionary Operations and Scoping in PostScript
+% Tests dictionary creation, begin/end scoping, variable shadowing,
+% and raw object lookup with 'load'.
+% ==============================================================================
+
+% 1. Global definition
+/x 100 def
+/y 200 def
+
+% 2. Create a custom dictionary and test 'known' on empty dict
+/subdict 5 dict def
+/is_known subdict /x known def   % false
+
+% 3. Enter subdict scope and shadow global variable 'x'
+subdict begin
+    /local_val 42 def
+    /x 999 def  % shadows global x
+
+    % Calculate using local shadowed 'x' and inherited global 'y'
+    /calc_in_scope x y add def  % 999 + 200 = 1199
+
+    % Leave in-scope values on stack
+    calc_in_scope local_val x
+end
+
+% 4. Verify that global 'x' and 'y' remained intact after 'end'
+x y add  % 100 + 200 = 300
+
+% 5. Test 'load' primitive: retrieves object without executing
+/x load  % 100
+
+% 6. Nested dictionary stacks (2 levels deep)
+/dictA 5 dict def
+/dictB 5 dict def
+
+dictA begin
+    /level 1 def
+    dictB begin
+        /level 2 def
+        level  % 2
+    end
+    level      % 1 (restored to dictA)
+end
+
+% Push the 'known' result on top
+is_known
+
+% Final operand stack top to bottom:
+% [false, 1, 2, 100, 300, 999, 42, 1199]

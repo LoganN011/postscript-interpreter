@@ -1,0 +1,80 @@
+% ==============================================================================
+% Control Flow & Logical Evaluation in PostScript
+% Tests relational comparisons, boolean algebra, nested conditionals,
+% forward and backward for-loops, and nested iterations.
+% ==============================================================================
+
+% 1. Piecewise signum function using nested ifelse
+/signum {
+    dup 0 lt
+        { pop -1 }
+        {
+            dup 0 gt
+                { pop 1 }
+                { pop 0 }
+            ifelse
+        }
+    ifelse
+} def
+
+-50 signum       % -1
+0 signum         % 0
+75 signum        % 1
+
+% 2. De Morgan's Law Verification: not(A and B) == (not A) or (not B)
+/de_morgan_and {
+    /b exch def
+    /a exch def
+    a b and not
+    a not b not or
+    eq
+} def
+
+true true de_morgan_and     % true
+true false de_morgan_and    % true
+false false de_morgan_and   % true
+
+% 3. Boolean XOR Identity: A xor B == (A or B) and not(A and B)
+/test_xor {
+    /b exch def
+    /a exch def
+    a b xor
+    a b or a b and not and
+    eq
+} def
+
+true false test_xor         % true
+true true test_xor          % true
+
+% 4. Nested For Loops: compute sum_{i=1..3} sum_{j=1..4} (i * j)
+% Expect: (1+2+3) * (1+2+3+4) = 6 * 10 = 60
+/nested_sum 0 def
+1 1 3 {
+    /i exch def
+    1 1 4 {
+        /j exch def
+        /nested_sum nested_sum i j mul add def
+    } for
+} for
+nested_sum                  % 60
+
+% 5. Decrementing For Loop (negative step)
+% Sum even numbers counting down from 10 to 2 by -2: 10 + 8 + 6 + 4 + 2 = 30
+/countdown_sum 0 def
+10 -2 2 {
+    /countdown_sum exch countdown_sum add def
+} for
+countdown_sum               % 30
+
+% 6. Repeat loop with accumulator: sum of powers of 2 (1 + 2 + 4 + 8 + 16 = 31)
+/p_sum 0 def
+/curr 1 def
+5 {
+    /p_sum p_sum curr add def
+    /curr curr 2 mul def
+} repeat
+p_sum                       % 31
+
+% Final operand stack top to bottom:
+% [31, 30, 60, true, true, true, true, true, 1, 0, -1]
+

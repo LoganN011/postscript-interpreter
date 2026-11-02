@@ -53,7 +53,7 @@ lookupDict key = do
   dicts <- gets dictStack
   return (foldr (\d acc -> case Map.lookup key d of 
                             Just v -> Just v
-                            Nothing -> acc) Nothing (reverse dicts))
+                            Nothing -> acc) Nothing dicts)
 
 --Bind a key-value pair in the current dictionary
 defineSymbol :: String -> Object -> Interpreter ()

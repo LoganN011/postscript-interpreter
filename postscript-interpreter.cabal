@@ -90,7 +90,6 @@ test-suite postscript-interpreter-test
         postscript-interpreter,
         containers,
         mtl,
-        HUnit,
         QuickCheck
 
 executable postscript-interpreter

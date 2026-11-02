@@ -1,0 +1,44 @@
+% ==============================================================================
+% Operand Stack Manipulation Primitives in PostScript
+% Tests dup, exch, pop, index, copy, roll, count, and custom stack procedures.
+% ==============================================================================
+
+% 1. Test dup, exch, and pop
+10 20 exch       % stack: 20 10
+dup              % stack: 20 10 10
+pop              % stack: 20 10
+
+% 2. Push additional items
+30 40 50         % stack bottom-to-top: 20, 10, 30, 40, 50
+
+% Test index: 0-index is 50, 2-index into [50, 50, ...] is 40, 4-index is 30
+0 index          % 50
+2 index          % 40
+4 index          % 30
+add add          % 30 + 40 + 50 = 120 -> stack top is 120
+
+% 3. Test copy (duplicate top 2 items: 50, 120)
+2 copy           % duplicates [120, 50] -> stack top has 50 120
+add              % 50 + 120 = 170
+
+% 4. Test roll
+% Stack top 3 items are: [170, 120, 50]
+3 1 roll         % cyclically shift top 3: [120, 50, 170]
+3 -1 roll        % reverse cyclical shift: [170, 120, 50]
+
+% 5. Test procedure with stack ops: reverse top 3 elements
+/reverse3 {
+    3 1 roll
+    exch
+} def
+
+reverse3         % [170, 120, 50] -> [50, 120, 170]
+
+% Sum the reversed top 3 items: 50 + 120 + 170 = 340
+add add
+
+% 6. Test count: remaining items on stack are 20, 10, 30, 40, 340 (total 5 items)
+count
+
+% Final operand stack top to bottom:
+% [5, 340, 40, 30, 10, 20]
