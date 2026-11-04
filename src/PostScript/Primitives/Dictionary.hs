@@ -31,6 +31,8 @@ psDict = do
          | otherwise -> push (PSDict Map.empty)
       _ -> error "Type error: argument must be an int"
 
+-- Note: 'put' and 'get' also operate on PSDict (insert and lookup key)
+
 -- 'begin': dict begin ->
 psBegin :: Interpreter ()
 psBegin = do

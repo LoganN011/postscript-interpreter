@@ -14,6 +14,7 @@ data Object
   | PSSymbol String
   | PSBlock [Object]
   | PSDict (Map String Object)
+  -- TODO: Add PSArray [Object] for arrays (e.g. [1 2 3], matrices)
   deriving (Show, Eq)
 
 -- 2D Affine Transformation Matrix

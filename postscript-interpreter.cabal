@@ -71,6 +71,8 @@ library
         -- PostScript.Primitives.Graphics.Transform
         -- PostScript.Primitives.Graphics.State
         -- PostScript.Primitives.Graphics.Render
+        -- PostScript.Primitives.Graphics.Text
+        -- PostScript.Primitives.Graphics.Image
     hs-source-dirs:   src
     build-depends:
         base >= 4.14 && < 5,

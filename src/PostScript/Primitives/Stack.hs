@@ -103,5 +103,22 @@ psPstack = do
     mapM_ print stack
     putStrLn "--- bottom of stack ---"
 
+-- TODO: Output & session operators:
+-- '=': any = -> pop and print value with newline
+-- '==': any == -> pop and debug-print syntax representation with newline
+-- 'print': string print -> pop string and print without newline
+-- 'quit': quit -> exit interpreter cleanly
+
+-- TODO: Array & container operators:
+-- 'array': int array -> allocate array of size n
+-- 'length': array|dict|string length -> number of elements
+-- 'get': array|dict|string index|key get -> element at index/key
+-- 'put': array|dict|string index|key val put -> update element at index/key
+-- 'forall': array|dict proc forall -> iterate elements with proc
+
+-- TODO: String & typography helpers:
+-- 'string': int string -> allocate string of size n
+-- 'cvs': any string cvs -> convert value to string in buffer
+
 
 

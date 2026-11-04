@@ -104,6 +104,7 @@ executeBuiltin name = case name of
   "clear" -> psClear
   "count" -> psCount
   "pstack" -> psPstack
+  -- TODO: wire output ops: "=" -> psPrintEq, "==" -> psPrintDebug, "print" -> psPrint, "quit" -> psQuit
   -- Math Primitives
   "add" -> psAdd
   "sub" -> psSub
@@ -147,6 +148,8 @@ executeBuiltin name = case name of
   "ifelse" -> psIfelse evalProgram
   "repeat" -> psRepeat evalProgram
   "for" -> psFor evalProgram
+  -- TODO: wire control ops: "exec", "loop", "exit", "bind"
+  -- TODO: wire container ops: "array", "length", "get", "put", "forall", "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
 

@@ -37,6 +37,7 @@ pNumber = lexeme $ do
         _ -> 1.0
   digits <- some digitChar
   mDec <- optional (char '.' *> some digitChar)
+  -- TODO: support scientific notation exponents (e.g. 1e5, 1.0E-5)
   case mDec of
     Just frac -> do
       let str = digits ++ "." ++ frac
@@ -66,6 +67,8 @@ pBlock = do
   objs <- many pObject
   _ <- symbol "}"
   return (PSBlock objs)
+
+-- TODO: parse array literals `pArray = PSArray <$> (symbol "[" *> many pObject <* symbol "]")`
 
 -- Parse executable symbol / operator (e.g., add, def, moveto, true, false)
 pSymbol :: Parser Object

@@ -158,3 +158,9 @@ psFor evalProg = do
                evalProg code
                loopReal (curr + step) step limit code
             | otherwise = return ()
+
+-- TODO: Add control primitives:
+-- 'exec': any exec -> executes block or symbol from stack
+-- 'loop': proc loop -> repeatedly executes proc until exit
+-- 'exit': exit -> breaks out of innermost enclosing loop
+-- 'bind': proc bind -> proc (inlines operators or acts as no-op)
