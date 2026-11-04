@@ -1,0 +1,50 @@
+%!PS
+%!Created by Fi, 26 Jun 1996
+% a4: 595 x 842
+0 setlinewidth
+/color false def % say /color true def, if you want colors
+/width 595 def
+/height 842 def
+/in { 72 mul } bind def
+/size { 1.2 in } bind def
+/sqrt2 1.41421356237310 def
+/limit 1.2 def
+/r 1 def /g 0 def /b 0 def
+/box { % stack: size
+    newpath
+    0 0 moveto
+    dup 0 rlineto
+    dup 0 exch rlineto
+    dup 0.5 mul dup dup -1 mul exch rlineto
+    -1 mul dup rlineto
+    closepath
+    color
+    {
+        r g b setrgbcolor fill r g b /g exch def /r exch def /b exch def
+    }
+    {
+        stroke
+    }
+    ifelse % stack: size
+    dup
+    limit gt
+    {
+        gsave
+        dup dup sqrt2 div exch 0 exch translate 45 rotate box
+        grestore 
+        gsave
+        dup sqrt2 div exch 2 div dup 3 mul translate 315 rotate box
+        grestore
+    }
+    {
+        pop
+    }
+    ifelse
+} def
+
+1 1 scale
+width 1.5 in sub height 2 div size 2 div sub translate
+90 rotate
+size box
+showpage
+

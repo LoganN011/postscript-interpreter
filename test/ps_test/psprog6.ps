@@ -1,0 +1,16 @@
+systemdict /put known =
+/a 333 def
+userdict /a known =
+userdict /b known =
+/a 444 def
+a =
+/d 2 dict def
+d /k 222 put
+d /l 999 put
+d /k get =
+d /m known =
+d /l known =
+userdict /d known =
+userdict /d get /l get =
+
+quit

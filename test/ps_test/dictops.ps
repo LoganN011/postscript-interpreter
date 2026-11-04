@@ -1,0 +1,19 @@
+%dictionary operators test
+
+<</a 3 /b 4>>
+begin %push <</a 3 /b 4>> onto the dict stack
+a b add = %7
+/a 2 def %change the value of a to 2
+a b add = %6
+end
+cleardictstack
+/mydict 2 dict def
+mydict begin
+countdictstack = %should return 4
+/a 2 def
+/b 3 def
+a b add = %5
+currentdict
+end
+cleardictstack
+quit

@@ -1,0 +1,64 @@
+1 cvi =
+-56 cvi =
+1.5 cvi =
+-37.9 cvi =
+(1) cvi =
+(-20) cvi =
+(14.5) cvi =
+(-16.73) cvi =
+
+1 cvr =
+-56 cvr =
+1.5 cvr =
+-37.9 cvr =
+(1) cvr =
+(-20) cvr =
+(14.5) cvr =
+(-16.73) cvr =
+
+
+() =    % blank line
+{1 1 add{3 4 add}}
+cvlit
+pstack clear
+
+() =    % blank line
+(1 2 add)
+cvx pstack
+exec pstack
+clear
+
+{1 2 add} xcheck ==
+[1 2 add] xcheck ==
+
+clear
+(abc) cvn ==
+(abc) cvn =
+(abc) cvx pstack cvn ==
+
+/temp 12 string def
+123 10 temp cvrs ==
+-123 10 temp cvrs ==
+123.4 10 temp cvrs ==
+123 16 temp cvrs ==
+-123 16 temp cvrs ==
+/temp 12 string def
+clear
+123.4 16 temp cvrs
+dup
+pstack
+1 35 put pstack
+temp  pstack
+clear
+(12) dup 1 35 put =
+
+/str 20 string def
+123 456 add str cvs = % 579
+mark str cvs = % --nostringval--
+
+
+1 type =
+(abc) type =
+{1 2 add} type =
+{add} bind pstack 0 get type pstack
+quit

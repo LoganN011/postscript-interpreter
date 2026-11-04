@@ -1,0 +1,69 @@
+[] ==
+{} ==
+{1 2 3} ==
+
+% test if operator
+true {111} if ==
+true {123 {456}} if ==
+false {-1} if ==
+false {-1 {-2}} if pstack
+true {true {9 8 7} if } if
+true {false {9 8 7} {111} ifelse } if
+
+% test ifelse
+true {1 0 add} {0 -1 add} ifelse
+false {1 0 add} {0 -1 add} ifelse
+
+% test loop
+{-1 -2 -3 exit} loop
+{-1 -2 -3 exit -4} loop
+
+% test the for op
+1 1 20 {} for
+0 100 1000 {} for
+-5 1 5 {} for
+5 -1 -5 {} for
+-999 1 1 5 {add} for
+0 .5 3 {} for
+
+% test repeat
+5 {1} repeat
+5 {1 1 add} repeat
+1000 { 1 1 exit} repeat
+
+pstack
+
+[] ==
+{} ==
+{1 2 3} ==
+
+% test if operator
+true {111} if ==
+true {123 {456}} if ==
+false {-1} if ==
+false {-1 {-2}} if pstack
+true {true {9 8 7} if } if
+true {false {9 8 7} {111} ifelse } if
+
+% test ifelse
+true {1 0 add} {0 -1 add} ifelse
+false {1 0 add} {0 -1 add} ifelse
+
+% test the for op
+1 1 20 {} for
+0 100 1000 {} for
+-5 1 5 {} for
+5 -1 -5 {} for
+-999 1 1 5 {add} for
+0 .5 3 {} for
+
+% test repeat
+5 {1} repeat
+5 {1 1 add} repeat
+1000 { 1 1 exit} repeat
+
+% test exec
+{2 3 add} exec
+
+pstack
+quit

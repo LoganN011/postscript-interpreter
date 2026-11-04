@@ -1,0 +1,177 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Title: Mandelbrot Set
+%%Creator: Eric Marsden <emarsden@mail.dotcom.fr>
+%%Pages: 1
+%%Orientation: Portrait
+%%PaperSize: A4
+%%EndComments
+
+/minxx 0 def
+/minyy 0 def
+/maxxx 0 def
+/maxyy 0 def
+/xxrange 1 def
+/yyrange 1 def
+/minX 0 def
+/minY 0 def
+/maxX 595 def
+/maxY 842 def
+/Xrange maxX minX sub def
+/Yrange maxY minY sub def
+
+/sx { minxx sub xxrange div Xrange mul minX add } def
+/sy { minyy sub yyrange div Yrange mul minY add } def
+/wx { minX sub Xrange div xxrange mul minxx add } def
+/wy { minY sub Yrange div yyrange mul minyy add } def
+/setExtent { % x1 y1 x2 y2 --
+   /maxyy exch def /maxxx exch def
+   /minyy exch def /minxx exch def
+   /xxrange { maxxx minxx sub } def
+   /yyrange { maxyy minyy sub } def
+} def
+
+/drawPoint {
+   moveto 1 1 rlineto stroke
+} def
+/scalePoint {
+   sy exch sx exch
+} def
+/scaleToWin {                 % i j -- x y
+   wy exch                    % y i
+   wx exch                    % x y
+} def
+
+/pset { scalePoint drawPoint } def
+/2dup { 1 index 1 index } def
+
+
+
+%% Mandelbrot set stuff
+/cdup {                    % x y -- x y x y
+   1 index 1 index
+} bind def
+/csqr {                    % x y -- x*x-y*y 2xy
+   dup dup mul             % x y y*y
+   2 index dup mul         % x y y*y x*x
+   sub neg                 % x y x*x-y*y
+   3 1 roll                % x*x-y*y x y
+   2 mul mul
+} bind def
+/cmodulus {                % x y -- sqrt(x*x+y*y)
+   dup mul exch
+   dup mul add
+   sqrt
+} bind def
+/c+ {                      % z1 z2 -- z1 + z2
+   3 -1 roll add exch
+   3 -1 roll add exch
+} bind def
+/c- {                      % z1 z2 -- z1 - z2
+   3 -1 roll sub
+   3  1 roll sub exch
+} bind def
+
+/isDiverging {             % x y -- flag
+   cmodulus 2.0 gt
+} bind def
+/mandelIter {              % zx zy -- z*z + c
+   csqr cx cy c+
+} bind def
+/MAXITER 50  def
+/MSetLevel {               % zx zy -- iterations
+   /cy exch def  /cx exch def
+   0 0.0 0.0 {             % iters zx zy
+      mandelIter           % iters zx' zy'
+      3 -1 roll            % zx' zy' iters
+      1 add                % zx' zy' iters'
+      dup MAXITER ge       % zx' zy' iters' flag1
+      3 index 3 index      % zx' zy' iters' flag1 zx' zy'
+      isDiverging or {     % zx' zy' iters' flag1 flag2 or
+         3 1 roll          % iters zx' zy'
+         /lastZy exch def  % iters zx'
+         /lastZx exch def  % iters
+         exit
+      } if
+      3 1 roll             % iters zx' zy'
+   } loop
+} bind def
+
+%% ---------------------- COLORING SCHEMES ---------------------------
+
+%% the Mandelbrot Set, all of the Mandelbrot Set and nothing
+%% but the Mandelbrot Set
+/strictMSet {              % iters -- 
+   MAXITER lt not {
+      0 0 0 setrgbcolor    % white
+   } {
+      1 1 1 setrgbcolor    % black
+   } ifelse
+} bind def
+
+%% black and white bands spreading out from the Mandelbrot Set
+/bandMSet {                 % iters --
+   2 mod 0 eq {
+      1 1 1 setrgbcolor
+   } { 
+      0 0 0 setrgbcolor
+   } ifelse
+} bind def
+
+%% levels of gray
+/grayMSet {                 % iters --
+   MAXITER div dup dup setrgbcolor
+} bind def
+
+/BWGetColor {
+   MSetLevel                % iters
+   grayMSet                 % or bandMSet or strictMSet
+} bind def
+/HSVGetColor {                 % x y --
+   MSetLevel
+   dup MAXITER eq {
+      pop 0.0 0.0 0.0 setrgbcolor   % black centre
+   } {      
+      50 div
+      0.25 sub dup 0.0 lt { 1 add } if
+      1.0 1.0 sethsbcolor
+   } ifelse
+} bind def
+
+/getColor {
+   % how to work out automatically whether color is available?
+   HSVGetColor
+} bind def
+
+/xinc 1 def
+/yinc 1 def
+
+%% fill the rectangular cell (i, j) -- (i+xinc, y+yinc)
+/fillCell {                 % i j --
+   moveto
+   xinc 0      rlineto
+   0 yinc      rlineto
+   xinc neg 0  rlineto
+   closepath fill
+} bind def
+
+/pixelwiseScan {            % --
+   -1.9 -1.2 0.6 1.2 setExtent
+   minX xinc maxX {  /i exch def
+   minY yinc maxY {  /j exch def
+      i j scaleToWin           % x y
+      getColor                 % 
+      i j fillCell
+   } for  % Y
+   } for  % X
+} def
+
+
+%%EndProlog  ----------------------------------------------
+
+1.0 setlinewidth
+pixelwiseScan
+showpage
+
+%%Trailer
+%%end
+%%EOF

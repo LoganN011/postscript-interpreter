@@ -1,0 +1,50 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%BoundingBox: 0 0 595 842
+
+64 dict begin
+
+%% Box example, PLRM2, p.153  -- extended
+
+/box
+{
+    newpath
+    0 0 moveto
+    0 1 lineto
+    1 1 lineto
+    1 0 lineto
+    closepath
+} def
+
+gsave
+72 72 scale
+box fill
+2 2 translate
+box fill
+grestore
+
+gsave
+1.0 0.0 0.0 setrgbcolor
+50 50 translate
+50 50 scale
+box fill
+grestore
+
+gsave
+0.0 1.0 0.0 setrgbcolor
+200 200 translate
+30 60 scale
+45 rotate
+box fill
+grestore
+
+gsave
+0.0 0.0 1.0 setrgbcolor
+300 300 translate
+45 rotate
+30 60 scale
+box fill
+grestore
+
+end
+showpage
+%%EOF

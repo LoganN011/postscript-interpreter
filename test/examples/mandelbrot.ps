@@ -1,0 +1,157 @@
+%! mandelbrot.ps - PS code to draw the Mandelbrot Set.
+%  by Richard J. Barbalace <rjbarbal@athena.mit.edu>, July 8, 1992.
+
+% This is a simple PS program to draw the Mandelbrot Set.
+% Do NOT send this to a public Athena printer: it will take forever
+% to print out and will not be impressive.  Instead, view the file
+% with your favorite previewer, and make a screen dump with xdpr if
+% you like.
+% The Mandelbrot set is a collection of points:  every point in the
+% complex plane is either within the set or outside it.  A complex
+% number (c = x + yi) is defined to be within the set by the following
+% iterative process:  With z initially set to be zero (z = 0, c = x + yi),
+% compute z = z^2 + c ad infinitum; if z remains finite, the point is
+% within the set; if z approaches infinity, the point is outside the set.
+% So given a starting number c:  take 0, square it, add the original number
+% c; take the new number (which is c), square it, add the original number c
+% (for the result z = c^2 + c); take the new result, square itself, add the
+% original number c; continue in this manner for a reasonably large number 
+% of iterations; the original number is in the set if the results do not
+% grow without bound.
+% This program plots a subset of the complex numbers in the set, testing
+% each point in a rectangular area of the plane.  The edges of the rectangular
+% image are defined by the variables x_start, y_start, x_end, y_end.  The
+% spacing between tested points is controlled by the step variable.  The
+% max variable determines the maximum number of iterations to try before
+% considering the point to be within the set.  Several initial procedures
+% are listed below and which may be used to view different sections of the
+% set on different scales.
+
+% Parameters you may change to examine portions of the Mandelbrot set:
+% x_start < x_end
+% y_start < y_end
+% step > 0 --- small step = good resolution but long wait
+% max should be small enough that you won't wait too long.
+
+% Sample initialization procedures:
+/initial_1 {% Full set
+/x_start -2 def				% Initial x value (real part)
+/y_start -2 def				% Initial y value (imaginary)
+/x_end 2 def				% Final x value (real part)
+/y_end 2 def				% Final y value (imaginary)
+/step .005 def				% Step between tested points
+/max 100 def				% Maximum number of iterations
+} def
+
+/initial_2 {% More detailed view
+/x_start -1 def				% Initial x value (real part)
+/y_start .3 def				% Initial y value (imaginary)
+/x_end -.98 def				% Final x value (real part)
+/y_end .32 def				% Final y value (imaginary)
+/step .00004 def			% Step between tested points
+/max 50 def				% Maximum number of iterations
+} def
+
+/initial_3 {% More detailed view
+/x_start -.9910 def			% Initial x value (real part)
+/y_start .3100 def			% Initial y value (imaginary)
+/x_end -.9890 def			% Final x value (real part)
+/y_end .3125 def			% Final y value (imaginary)
+/step .000004 def			% Step between tested points
+/max 50 def				% Maximum number of iterations
+} def
+
+/initial_4 {% Another more detailed view
+/x_start -0.8 def			% Initial x value (real part)
+/y_start 0 def				% Initial y value (imaginary)
+/x_end -0.7 def				% Final x value (real part)
+/y_end 0.25 def				% Final y value (imaginary)
+/step .00025 def			% Step between tested points
+/max 50 def				% Maximum number of iterations
+} def
+
+/initial_5 {% More detailed view
+/x_start -0.75 def			% Initial x value (real part)
+/y_start 0.20 def			% Initial y value (imaginary)
+/x_end -0.71 def			% Final x value (real part)
+/y_end 0.25 def				% Final y value (imaginary)
+/step .00005 def			% Step between tested points
+/max 50 def				% Maximum number of iterations
+} def
+
+/initial_6 {% More detailed view
+/x_start -0.74 def			% Initial x value (real part)
+/y_start 0.215 def			% Initial y value (imaginary)
+/x_end -0.725 def			% Final x value (real part)
+/y_end 0.235 def			% Final y value (imaginary)
+/step .000025 def			% Step between tested points
+/max 150 def				% Maximum number of iterations
+} def
+
+/initial_7 {% More detailed view
+/x_start -0.739 def			% Initial x value (real part)
+/y_start 0.216 def			% Initial y value (imaginary)
+/x_end -0.732 def			% Final x value (real part)
+/y_end 0.225 def			% Final y value (imaginary)
+/step .000010 def			% Step between tested points
+/max 250 def				% Maximum number of iterations
+} def
+
+% Choose one of the initializing routines or enter your own
+initial_1
+
+% Do not change anything below
+
+% General procedures
+/inch {72 mul} def
+/minimum {% Return the lesser of two top stack values
+	/b exch def
+	/a exch def
+	a b le {a} {b} ifelse
+} def
+
+% Scaling things for the page
+/page_width 8.5 inch def
+/page_height 11 inch def
+page_width 2 div page_height 2 div translate	% Set origin at center of page
+
+/x_domain x_end x_start sub def		% Domain of x numbers
+/x_range page_width .9 mul def		% Horizontal space on page, w/ margins
+/x_scale x_range x_domain div def	% Maximum x scaling factor
+/y_domain y_end y_start sub def		% Domain of y numbers
+/y_range page_height .9 mul def		% Vertical space on page, w/ margins
+/y_scale y_range y_domain div def	% Maximum y scaling factor
+/page_scale x_scale y_scale minimum def	% Final scaling factor	
+
+page_scale dup scale			% Set proper scale
+
+x_domain 2 div x_start add neg	% x distance from image center to origin
+y_domain 2 div y_start add neg	% y distance from image center to origin
+translate			% move origin so image is centered on page
+
+/point {% Plot a point
+	1 page_scale div 0 360 arc fill
+} bind def
+
+% Plot points in Mandelbrot set
+x_start step x_end {
+	/x exch def
+	y_start step y_end {
+		/y exch def
+		/plot true def
+		/zx 0 def
+		/zy 0 def
+		max {
+			zx dup mul zy dup mul add 4 gt
+			{/plot false def exit}
+			{% Calculate next value
+				2 zx zy mul mul y add
+				/zx zx dup mul zy dup mul sub x add def
+				/zy exch def
+			} ifelse
+		} repeat
+		plot { x y point } if		% Plot point if point is in set
+	} for
+} for
+
+showpage

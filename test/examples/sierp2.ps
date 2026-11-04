@@ -1,0 +1,39 @@
+%!
+0 setlinewidth
+% l n Sierpk2Gasket
+% Draw a Sierpinski gasket recursivelly to a depth of N, with struts L long.
+/Sierpk2Gasket
+{
+   1 index 2 div 0 exch
+   gsave
+      newpath
+      3 index 300 div setlinewidth
+      0 0 moveto 2 copy rlineto
+      2 copy translate
+      dup 3 index 1 sub dup 0 eq { pop pop } { Sierpk2Gasket } ifelse
+      stroke
+   grestore
+   gsave
+      newpath
+      3 index 300 div setlinewidth
+      0 0 moveto 2 copy 120 rotate rlineto
+      2 copy translate
+      dup 3 index 1 sub dup 0 eq { pop pop } { Sierpk2Gasket } ifelse
+      stroke
+   grestore
+   gsave
+      newpath
+      3 index 300 div setlinewidth
+      0 0 moveto 2 copy 240 rotate rlineto
+      2 copy translate
+      dup 3 index 1 sub dup 0 eq { pop pop } { Sierpk2Gasket } ifelse
+      pop pop
+      stroke
+   grestore
+   pop pop
+} def
+
+72 225 add 150 250 add translate
+225 10 Sierpk2Gasket
+
+showpage

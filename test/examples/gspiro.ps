@@ -1,0 +1,23 @@
+%!
+/inch {72 mul} def
+
+newpath
+2 inch 8 inch moveto
+%0 setgray
+%/Time-Roman findfont
+%20 scalefont
+%setfont
+%(Here is a simple spirograph drawing.) show
+
+%0.7 setgray
+0.7 0.7 0.7 setrgbcolor
+
+300 300 translate
+0 10 360 {%for
+	pop
+		0 -50 moveto 200 0 lineto 0 50 lineto
+		10 rotate
+		}for
+		stroke
+
+		showpage

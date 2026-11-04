@@ -1,0 +1,17 @@
+% array operators test file
+
+/myarray 3 array def
+myarray 1 4 put
+myarray 0 3 put
+myarray 2 5 put
+myarray
+pstack         %[3 4 5]
+myarray 1 get
+myarray 0 get
+add =           %7
+clear
+[1 2 3]
+{1 add} forall
+pstack %2 3 4
+
+quit

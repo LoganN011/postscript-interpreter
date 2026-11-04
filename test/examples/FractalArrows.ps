@@ -1,0 +1,43 @@
+%!PS-1.0
+%%Title: Fractal Arrow (2 pages)
+%-----Variables & Procedures-----
+/depth 0 def
+/maxdepth 10 def
+/down {/depth depth 1 add def} def
+/up {/depth depth 1 sub def} def
+
+/DoLine		% print a vert. line
+{ 0 144 rlineto currentpoint
+  stroke translate 0 0 moveto } def
+
+/FractArrow
+{ /sc exch def 
+  gsave sc dup scale
+  10 setlinewidth
+  down DoLine
+  depth maxdepth le
+  { 135 rotate sc FractArrow
+    -270 rotate sc FractArrow} if
+  up grestore} def
+
+%
+%-----Begin Program-----
+%%Page: 1
+gsave
+	300 400 moveto 3 3 scale
+	.6 FractArrow
+	180 rotate .6 FractArrow
+	stroke
+grestore
+showpage
+
+%%Page: 2
+gsave
+	305 400 moveto 3 3 scale
+	.7 FractArrow
+	90 rotate .7 FractArrow
+	180 rotate .7 FractArrow
+	270 rotate .7 FractArrow
+	stroke
+grestore
+showpage

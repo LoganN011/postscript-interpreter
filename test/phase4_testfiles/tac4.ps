@@ -1,0 +1,34 @@
+1 cvi =
+-56 cvi =
+1.5 cvi =
+-37.9 cvi =
+
+1 cvr =
+-56 cvr =
+1.5 cvr =
+-37.9 cvr =
+
+() =    % blank line
+{1 1 add{3 4 add}}
+cvlit
+pstack clear
+
+{1 2 add} xcheck ==
+[1 2 add] xcheck ==
+
+clear
+%(abc) cvn ==
+%(abc) cvn =
+%(abc) cvx pstack cvn ==
+
+
+/str (12345678901234567890) def
+123 456 add str cvs = % 579
+mark str cvs = % --nostringval--
+
+
+1 type =
+(abc) type =
+{1 2 add} type =
+{add} bind pstack 0 get type pstack
+quit

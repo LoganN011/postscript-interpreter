@@ -1,0 +1,147 @@
+%	(* original ML code: *)
+%	let
+%	    val square = fn x => x * x
+%	    val rec map = fn f =>
+%			    let
+%				val h = fn l =>
+%					if l = nil then
+%					    nil
+%					else
+%					    f (hd l) :: (map f) (tl l)
+%			    in
+%				h
+%			    end
+%	in
+%	    let
+%		val g = map square
+%	    in
+%		g [1,2,3]
+%	    end
+%	end
+%	(* evaluates to [1,4,9] : int list *)
+%	
+%	(* after naive closure conversion (not typable in ML): *)
+%	fun select_0_code {code} = code
+%	fun select_1_code {code,fv1} = code
+%	fun select_1_fv1 {code,fv1} = fv1
+%	fun select_2_code {code,fv1,fv2} = code
+%	fun select_2_fv1 {code,fv1,fv2} = fv1
+%	fun select_2_fv2 {code,fv1,fv2} = fv2
+%	let
+%	    val square =
+%		let
+%		    val square' = fn (clo, x) => x * x
+%		in
+%		    {code=square'}
+%		end
+%	    val map =
+%		let
+%		    val map' = fn (clo, f) =>
+%				let
+%				    val h' = fn (clo, l) =>
+%						if l = nil then
+%						    nil
+%						else
+%						    (select_2_fv2 clo) l ::
+%						    ((select_2_fv1 clo) (select_2_fv2 clo)) (tl l)
+%				in
+%				    {code=h',fv1=clo (*i.e., map *),fv2=f}
+%				end
+%		in
+%		    {code=map'}
+%		end
+%	in
+%	    let
+%		val g = (select_0_code map) (map, square)
+%	    in
+%		(select_1_code g) (g, [1,2,3])
+%	    end
+%	end
+
+
+%% pair, hd, tl are considered primitives
+%%   and are implemented without closures
+
+% x y pair p
+/pair
+{
+    2 array dup dup
+    1 5 -1 roll put
+    0 4 -1 roll put
+} def
+% p hd x
+/hd
+{
+    0 get
+} def
+% p tl x
+/tl
+{
+    1 get
+} def
+
+% text is a repository for compiled closures
+/text 0 dict def
+text
+begin
+    /square
+    [
+	{%fn (clo, x)
+	    1 index	%x
+	    2 index	%x
+	    mul
+	    3 1 roll 2 {pop} repeat	%return
+	}
+    ] def
+    /map
+    [
+	{%fn (clo, f)
+	    [
+		{%fn (clo, l)
+		    1 index	%l
+		    null
+		    eq
+			{null}
+			{
+			    % l hd f apply l tl f map apply apply pair
+			    1 index	%l
+			    hd
+			    1 index	%clo
+			    2 get	%f
+			    dup 0 get	%f's code
+			    exec	%f (hd l)
+			    2 index	%l
+			    tl
+			    2 index	%clo
+			    2 get	%f
+			    3 index	%clo
+			    1 get	%map
+			    dup 0 get	%map's code
+			    exec	%map f
+			    dup 0 get	%(map f)'s code
+			    exec	%map f (tl l)
+			    pair
+			}
+		    ifelse
+		    3 1 roll 2 {pop} repeat	%return
+		} %h'
+		2 index		%clo, i.e., map
+		4 index		%f
+	    ]
+	    3 1 roll 2 {pop} repeat	%return
+	} %map'
+    ] def
+end
+
+%a sort of top-level
+/localdict 0 dict def
+localdict
+begin
+    /thelist 1 2 3 null pair pair pair def
+    /mapsquare text /square get text /map get dup 0 get exec def
+    thelist mapsquare dup 0 get exec
+end
+=
+
+%prints [1 [4 [9 null]]]
+quit

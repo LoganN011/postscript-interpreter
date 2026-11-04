@@ -1,0 +1,44 @@
+(abcde) dup (abc) anchorsearch pstack
+
+10 string ==
+10 string =
+
+(abcdef)
+dup
+1 35 put
+pstack
+clear
+
+(abbc) (ab) anchorsearch pstack clear % (bc) (ab) true
+(abbc) (bb) anchorsearch pstack clear % (abbc) false
+(abbc) (bc) anchorsearch pstack clear % (abbc) false
+(abbc) (B) anchorsearch pstack clear % (abbc) false
+
+/a (abcdefg) def
+a
+(abcd)
+anchorsearch =
+1 35 put
+2 37 put
+a
+==
+
+
+pstack
+() =                % print a blank line
+() =                % print a blank line
+(abbc) (ab) search pstack clear
+(abbc) (bb) search pstack clear
+(abbc) (bc) search pstack clear
+(abbc) (B) search pstack clear
+(abbc) (ab) search pstack clear
+
+/temp (abcdefghi) def
+temp (ab) search 
+pop pop
+1 35 put
+1 37 put
+temp ==
+
+
+quit

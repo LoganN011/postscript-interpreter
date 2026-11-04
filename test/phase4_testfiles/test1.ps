@@ -1,0 +1,17 @@
+[1 [4 5 6] 3]
+/saveState1 save def
+pstack
+dup 0 99 put
+dup 1 get 0 99 put
+/saveState2 save def
+pstack
+dup 2 88 put
+dup 1 get 2 55 put
+/saveState3 save def
+pstack
+saveState2 restore
+pstack
+saveState1 restore
+pstack
+quit
+

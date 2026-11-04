@@ -1,0 +1,231 @@
+%!PS-Adobe-3.0 EPSF-3.0
+
+                
+%%BoundingBox:0 0 288 288
+userdict begin
+        /ok_EllipseDict 50 dict def
+end
+ok_EllipseDict begin
+        /ok_Ellipse
+        {
+                ok_xOffset ok_yOffset moveto
+                ok_x1 0 ok_xR ok_y1 ok_xR ok_yR rcurveto
+                0 ok_y1 ok_x1 neg ok_yR ok_xR neg ok_yR rcurveto
+                ok_x1 neg 0 ok_xR neg ok_y1 neg ok_xR neg ok_yR neg rcurveto
+                0 ok_y1 neg ok_x1 ok_yR neg ok_xR ok_yR neg rcurveto
+                closepath
+        } def
+        /ok_Ellipses
+        {
+                %on stack:
+                %xCenter yCenter xOffset yOffset width height weight howMany [color array]
+                aload pop
+		%%DS     setcmykcolor
+		pop setrgbcolor	%%DS 
+                /ok_HowMany exch def
+                /ok_Weight exch def
+                /ok_Height exch def
+                /ok_Width exch def
+                /ok_yOffset exch def
+                /ok_xOffset exch def
+                /ok_yCenter exch def
+                /ok_xCenter exch def
+                /ok_Angle 360 ok_HowMany div def
+                /ok_xR ok_Width 2 div def
+                /ok_yR ok_Height 2 div def
+                /ok_x1 ok_xR ok_xR .552292 mul sub def
+                /ok_y1 ok_yR ok_yR .552292 mul sub def
+                ok_Weight setlinewidth
+                gsave
+                ok_xCenter ok_yCenter translate
+                ok_HowMany
+                {
+                        ok_Ellipse
+                        ok_Angle rotate
+                } repeat
+                stroke
+                grestore
+        } def
+        /ok_EllipsesTwo
+        {
+                %on stack:
+                %xCenter yCenter xOffset yOffset width height weight angle initAngle howMany [color array]
+                aload pop
+		%%DS     setcmykcolor
+		pop setrgbcolor	%%DS 
+                /ok_HowMany exch def
+                /ok_InitialAngle exch def
+                /ok_Angle exch def
+                /ok_Weight exch def
+                /ok_Height exch def
+                /ok_Width exch def
+                /ok_yOffset exch def
+                /ok_xOffset exch def
+                /ok_yCenter exch def
+                /ok_xCenter exch def
+                /ok_xR ok_Width 2 div def
+                /ok_yR ok_Height 2 div def
+                /ok_x1 ok_xR ok_xR .552292 mul sub def
+                /ok_y1 ok_yR ok_yR .552292 mul sub def
+                ok_Weight setlinewidth
+                gsave
+                ok_xCenter ok_yCenter translate
+                ok_InitialAngle rotate
+                ok_HowMany
+                {
+                        ok_Ellipse
+                        ok_Angle rotate
+                } repeat
+                stroke
+                grestore
+        } def
+end
+ok_EllipseDict begin
+%%xCenter yCenter xOffset yOffset width height weight angle initAngle how many  C M Y K 
+144 144 0 36 36 72 0.2 2 45 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 36.25 35.75 71.5 0.2 2 47.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 36.5 35.5 71 0.2 2 50 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 36.75 35.25 70.5 0.2 2 52.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 37 35 70 0.2 2 55 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 37.25 34.75 69.5 0.2 2 57.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 37.5 34.5 69 0.2 2 60 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 37.75 34.25 68.5 0.2 2 62.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 38 34 68 0.2 2 65 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 38.25 33.75 67.5 0.2 2 67.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 38.5 33.5 67 0.2 2 70 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 38.75 33.25 66.5 0.2 2 72.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 39 33 66 0.2 2 75 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 39.25 32.75 65.5 0.2 2 77.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 39.5 32.5 65 0.2 2 80 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 39.75 32.25 64.5 0.2 2 82.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 40 32 64 0.2 2 85 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 40.25 31.75 63.5 0.2 2 87.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 40.5 31.5 63 0.2 2 90 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 40.75 31.25 62.5 0.2 2 92.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 41 31 62 0.2 2 95 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 41.25 30.75 61.5 0.2 2 97.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 41.5 30.5 61 0.2 2 100 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 41.75 30.25 60.5 0.2 2 102.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 42 30 60 0.2 2 105 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 42.25 29.75 59.5 0.2 2 107.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 42.5 29.5 59 0.2 2 110 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 42.75 29.25 58.5 0.2 2 112.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 43 29 58 0.2 2 115 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 43.25 28.75 57.5 0.2 2 117.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 43.5 28.5 57 0.2 2 120 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 43.75 28.25 56.5 0.2 2 122.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 44 28 56 0.2 2 125 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 44.25 27.75 55.5 0.2 2 127.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 44.5 27.5 55 0.2 2 130 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 44.75 27.25 54.5 0.2 2 132.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 45 27 54 0.2 2 135 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 45.25 26.75 53.5 0.2 2 137.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 45.5 26.5 53 0.2 2 140 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 45.75 26.25 52.5 0.2 2 142.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 46 26 52 0.2 2 145 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 46.25 25.75 51.5 0.2 2 147.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 46.5 25.5 51 0.2 2 150 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 46.75 25.25 50.5 0.2 2 152.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 47 25 50 0.2 2 155 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 47.25 24.75 49.5 0.2 2 157.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 47.5 24.5 49 0.2 2 160 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 47.75 24.25 48.5 0.2 2 162.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 48 24 48 0.2 2 165 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 48.25 23.75 47.5 0.2 2 167.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 48.5 23.5 47 0.2 2 170 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 48.75 23.25 46.5 0.2 2 172.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 49 23 46 0.2 2 175 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 49.25 22.75 45.5 0.2 2 177.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 49.5 22.5 45 0.2 2 180 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 49.75 22.25 44.5 0.2 2 182.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 50 22 44 0.2 2 185 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 50.25 21.75 43.5 0.2 2 187.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 50.5 21.5 43 0.2 2 190 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 50.75 21.25 42.5 0.2 2 192.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 51 21 42 0.2 2 195 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 51.25 20.75 41.5 0.2 2 197.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 51.5 20.5 41 0.2 2 200 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 51.75 20.25 40.5 0.2 2 202.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 52 20 40 0.2 2 205 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 52.25 19.75 39.5 0.2 2 207.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 52.5 19.5 39 0.2 2 210 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 52.75 19.25 38.5 0.2 2 212.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 53 19 38 0.2 2 215 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 53.25 18.75 37.5 0.2 2 217.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 53.5 18.5 37 0.2 2 220 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 53.75 18.25 36.5 0.2 2 222.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 54 18 36 0.2 2 225 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 54.25 17.75 35.5 0.2 2 227.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 54.5 17.5 35 0.2 2 230 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 54.75 17.25 34.5 0.2 2 232.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 55 17 34 0.2 2 235 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 55.25 16.75 33.5 0.2 2 237.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 55.5 16.5 33 0.2 2 240 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 55.75 16.25 32.5 0.2 2 242.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 56 16 32 0.2 2 245 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 56.25 15.75 31.5 0.2 2 247.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 56.5 15.5 31 0.2 2 250 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 56.75 15.25 30.5 0.2 2 252.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 57 15 30 0.2 2 255 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 57.25 14.75 29.5 0.2 2 257.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 57.5 14.5 29 0.2 2 260 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 57.75 14.25 28.5 0.2 2 262.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 58 14 28 0.2 2 265 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 58.25 13.75 27.5 0.2 2 267.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 58.5 13.5 27 0.2 2 270 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 58.75 13.25 26.5 0.2 2 272.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 59 13 26 0.2 2 275 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 59.25 12.75 25.5 0.2 2 277.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 59.5 12.5 25 0.2 2 280 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 59.75 12.25 24.5 0.2 2 282.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 60 12 24 0.2 2 285 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 60.25 11.75 23.5 0.2 2 287.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 60.5 11.5 23 0.2 2 290 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 60.75 11.25 22.5 0.2 2 292.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 61 11 22 0.2 2 295 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 61.25 10.75 21.5 0.2 2 297.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 61.5 10.5 21 0.2 2 300 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 61.75 10.25 20.5 0.2 2 302.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 62 10 20 0.2 2 305 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 62.25 9.75 19.5 0.2 2 307.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 62.5 9.5 19 0.2 2 310 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 62.75 9.25 18.5 0.2 2 312.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 63 9 18 0.2 2 315 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 63.25 8.75 17.5 0.2 2 317.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 63.5 8.5 17 0.2 2 320 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 63.75 8.25 16.5 0.2 2 322.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 64 8 16 0.2 2 325 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 64.25 7.75 15.5 0.2 2 327.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 64.5 7.5 15 0.2 2 330 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 64.75 7.25 14.5 0.2 2 332.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 65 7 14 0.2 2 335 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 65.25 6.75 13.5 0.2 2 337.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 65.5 6.5 13 0.2 2 340 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 65.75 6.25 12.5 0.2 2 342.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 66 6 12 0.2 2 345 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 66.25 5.75 11.5 0.2 2 347.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 66.5 5.5 11 0.2 2 350 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 66.75 5.25 10.5 0.2 2 352.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 67 5 10 0.2 2 355 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 67.25 4.75 9.5 0.2 2 357.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 67.5 4.5 9 0.2 2 360 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 67.75 4.25 8.5 0.2 2 362.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 68 4 8 0.2 2 365 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 68.25 3.75 7.5 0.2 2 367.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 68.5 3.5 7 0.2 2 370 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 68.75 3.25 6.5 0.2 2 372.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 69 3 6 0.2 2 375 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 69.25 2.75 5.5 0.2 2 377.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 69.5 2.5 5 0.2 2 380 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 69.75 2.25 4.5 0.2 2 382.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 70 2 4 0.2 2 385 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 70.25 1.75 3.5 0.2 2 387.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 70.5 1.5 3 0.2 2 390 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 70.75 1.25 2.5 0.2 2 392.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 71 1 2 0.2 2 395 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 71.25 0.75 1.5 0.2 2 397.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 71.5 0.5 1 0.2 2 400 1 [ 0 0 0 1 ] ok_EllipsesTwo
+144 144 0 71.75 0.25 0.5 0.2 2 402.5 1 [ 0 0 0 1 ] ok_EllipsesTwo
+end
+% % EOF
+showpage

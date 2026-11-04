@@ -1,0 +1,111 @@
+%!
+% lines will be black until this is superseded
+%0 setgray
+%/Times-Roman findfont
+%10 scalefont
+%setfont
+
+/arrow2    % calling syntax:  len yloc xloc theta arrow2
+{%def
+	dup
+	dup
+	/theta exch def          % direction of arrow
+	cos
+	/costheta exch def
+	sin
+	/sintheta exch def
+	/xloc exch def           % middle x of arrow
+	/yloc exch def           % middle y of arrow
+	dup
+	/len exch def            % length of arrow 
+	2 div 
+	/hlen exch def
+	costheta hlen mul 
+	dup
+	/xdelta exch def
+	sintheta hlen mul 
+	dup
+	/ydelta exch def
+
+	xloc xdelta add
+	dup
+	/xbow exch def
+
+	yloc ydelta sub
+	dup
+	/ybow exch def
+
+	% draw along the +x axis
+	% mid to bow
+	gsave
+	xloc yloc moveto
+	theta -1 mul rotate
+	len 2 div 0 rlineto stroke
+	grestore
+	
+	% draw along the +x axis
+	% mid to stern
+	gsave
+	xloc yloc moveto
+	theta -1 mul 180 sub rotate
+	len 2 div 0 rlineto stroke
+	grestore
+
+	% draw long the +x axis
+	%   arrow tails 30 degrees from spine
+	gsave
+	xbow ybow moveto
+	theta -1 mul 210 add rotate
+	len 10 div 0 rlineto stroke
+	grestore
+	gsave
+	xbow ybow moveto
+	theta -1 mul 150 add rotate
+	len 10 div 0 rlineto stroke
+	grestore
+
+}bind def
+
+% calling syntax:  len yloc xloc theta arrow2
+
+100 670 300 0 arrow2
+100 670 300 45 arrow2
+100 670 300 90 arrow2
+100 670 300 135 arrow2
+100 670 300 180 arrow2
+100 670 300 225 arrow2
+100 670 300 270 arrow2
+100 670 300 315 arrow2
+100 670 300 360 arrow2
+
+%0 5 800{
+%	dup dup dup dup
+%	arrow2
+%	} bind for
+%
+
+%100 450 0 270 arrow2
+%100 450 10 270 arrow2
+%100 450 20 270 arrow2
+
+0 5 600{
+	/ndx exch def
+	25 100 ndx 270 arrow2
+	} bind for
+
+0 10 600{
+	/ndx exch def
+	50 200 ndx 270 arrow2
+	} bind for
+
+0 25 600{
+	/ndx exch def
+	100 300 ndx 270 arrow2
+	} bind for
+
+0 50 600{
+	/ndx exch def
+	200 500 ndx 270 arrow2
+	} bind for
+
+showpage

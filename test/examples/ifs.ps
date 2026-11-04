@@ -1,0 +1,66 @@
+%!PS-Adobe-2.0
+%%DoucumentFonts:
+%%Title: IFS-fractals
+%%Creator: Bjorn Samuelsson
+%%Pages: 3
+%%BoundingBox:  50 50 545 792
+%%EndComments
+
+%IFS fractal generator
+%Bjorn Samuelsson 7/5-2003. Copy and enjoy!
+%Keep this comment and add a notice if you alter the definition of ifs.
+%Arguments: bbox_x1  bbox_y1  bbox_x2  bbox_y2  transform_matrix_array
+%           convex-hull_resolution(positive integer)  coarseness
+/ifs{save 8 1 roll/D{def}def/C{bind D}D/F{forall}D/X{cvx}D<</E/exch/O
+/pop/U/dup/G/get/u/put/M/matrix/+/add/-/sub/*/mul/./div/Y/copy/I/index
+/t/translate/o/roll/Q/itransform/S{E D}>>{X D}F U */k S 4 */N S/n N 1
+- D/V[0 1 n{[E -1e8 E 360 N . * U cos E sin]}for]D /T S[T{[E M Y/m S[0
+3]{m E 2 Y G 1 - u}F 0 0 m Q]}F]{1/f S[E{/p S T{/m S[p{}F m
+transform]}F}F]{/p S V{/v S v{}F E p{* E}F +/s S s - -1e-8 le{v 0 s
+u/f 0 D}if}F}F[V n G{}F V{{}F[[6 4 2 8 6 9 7]{I}F 0 0]Q]7 1 o 6 3 o O
+O O}F O O O]f 0 ne{exit}if}loop 0 N 4 . cvi n{V E G 0 G}for[/h/g/f/e/P
+/d/c/b/a]{S}F/A{-.5 * E .5 * +}D/B{neg A}D a c B b d B t c a A e g B
+. d b A f h B . 2 Y gt{E}if O U scale g e A h f A t/l[P {{}F/lineto
+X}F]U 2/moveto X u X C/p[T{1[/I/M/concatmatrix/r]{X}F}F/O X]X C/r{U{}F
+O O 4 1 o * 3 1 o * - abs k ge/p load{m setmatrix concat l closepath
+fill}ifelse}C/m M currentmatrix D M identmatrix r restore}def
+
+%%EndProlog
+
+%%Page: 1 1
+%the Sierpinski triangle
+50 50 545 792 %bounding box for the fractal
+[  %IFS-transformations
+    [0.5 0 0 0.5  0.866 -0.5]
+    [0.5 0 0 0.5  0.0    1.0]
+    [0.5 0 0 0.5 -0.866 -0.5]
+]
+6    % = n. The complex hull is approximated with a 4n-gon.
+.002 %coarseness - the scale ratio of the smallest structures to the whole
+ifs  %calls the fractal generator
+showpage
+
+%%Page: 2 2
+%pentagonal fractal
+50 50 545 792 
+[
+    [-0.381966 0 0 -0.381966  0.587785244 -0.809017]
+    [-0.381966 0 0 -0.381966  0.95105654   0.309017]
+    [-0.381966 0 0 -0.381966  0.0          1.0]
+    [-0.381966 0 0 -0.381966 -0.95105654   0.309017]
+    [-0.381966 0 0 -0.381966 -0.587785244 -0.809017]
+]
+6 .005 ifs
+showpage
+
+%%Page: 3 3
+%fern
+50 50 545 792 
+[
+  [ 0.001  0.00  0.00  0.16  0.00  0.00]
+  [ 0.85  -0.04  0.04  0.85  0.00  1.60]
+  [ 0.24   0.23 -0.30  0.18  0.00  0.44]
+  [-0.15   0.26  0.28  0.14  0.00  1.04]
+]
+6 .004 ifs
+showpage

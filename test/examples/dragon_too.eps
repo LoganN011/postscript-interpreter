@@ -1,0 +1,75 @@
+%!
+%%      generate binary dragon.
+%
+%       A space-filling curve.  If you were to round the corners, the line
+%       would never intersect itself.
+%
+%       The algorithm:  Initialize a counter to 1.  Find the least 
+%       significant "1" bit in the counter.  The next more significant
+%       bit in the counter determines move left or move right. Increment
+%       the counter. Repeat until the counter reaches 2**n, where n is 
+%       the "order" of the dragon.
+%
+%       My first postscript program from a few years ago.
+%
+%       Rick Watson
+%       University of Texas Computation Center
+%        arpa:   ccaw001@utadnx.cc.utexas.edu
+%        uucp:   ...seismo!ut-sally!ut-emx!rick
+%        bitnet: ccaw001@utadnx
+%        span:   utspan::ccaw001
+%        phone:  512/471-8220 471-3241
+%
+/dragon
+{
+        currentpoint /y exch def /x exch def
+        /movex 0 def
+        /movey step def
+        1 1 1 order bitshift {
+                {
+                        dup 1 and 0 ne {exit} if
+                        -1 bitshift
+                } loop
+                2 and 0 ne {
+                        movex 0 ne {
+                                /movey movex def
+                                /movex 0 def
+                        }
+                        {
+                                /movex movey neg def
+                                /movey 0 def
+                        } ifelse
+                }
+                {
+                        movex 0 ne {
+                                /movey movex neg def
+                                /movex 0 def
+                        }
+                        {
+                                /movex movey def
+                                /movey 0 def
+                        } ifelse
+                } ifelse
+                /x x movex add def /y y movey add def
+                x y lineto
+                currentpoint
+                stroke
+                moveto
+        } for
+} def
+
+/step 4 def             % set step size
+/order 14 def           % set order
+72. 300. div dup scale
+5 300 mul dup moveto
+0 setlinewidth
+dragon
+
+/step 16 def
+/order 6 def
+5 300 mul 7 300 mul moveto
+dragon
+
+showpage
+
+

@@ -1,0 +1,67 @@
+%!PS-Adobe-3.0 EPSF-3.0
+
+                
+%%BoundingBox:0 0 288 288
+%%ColorUsage: Color
+%%DocumentProcessColors: Cyan Magenta Yellow Black
+/ok_Ellipse
+{
+        ok_xOffset ok_yOffset moveto
+        ok_x1 0 ok_xR ok_y1 ok_xR ok_yR rcurveto
+        0 ok_y1 ok_x1 neg ok_yR ok_xR neg ok_yR rcurveto
+        ok_x1 neg 0 ok_xR neg ok_y1 neg ok_xR neg ok_yR neg rcurveto
+        0 ok_y1 neg ok_x1 ok_yR neg ok_xR ok_yR neg rcurveto
+        closepath
+} def
+/ok_Ellipses
+{
+        %on stack:
+        %xCenter yCenter xOffset yOffset width height weight howMany [color array]
+        aload pop
+	%%DS     setcmykcolor
+	pop setrgbcolor	%%DS 
+        /ok_HowMany exch def
+        /ok_Weight exch def
+        /ok_Height exch def
+        /ok_Width exch def
+        /ok_yOffset exch def
+        /ok_xOffset exch def
+        /ok_yCenter exch def
+        /ok_xCenter exch def
+        /ok_Angle 360 ok_HowMany div def
+        /ok_xR ok_Width 2 div def
+        /ok_yR ok_Height 2 div def
+        /ok_x1 ok_xR ok_xR .552292 mul sub def
+        /ok_y1 ok_yR ok_yR .552292 mul sub def
+        ok_Weight setlinewidth
+        gsave
+        ok_xCenter ok_yCenter translate
+        ok_HowMany
+        {
+                ok_Ellipse
+                ok_Angle rotate
+        } repeat
+        stroke
+        grestore
+} def
+%here's an example call to the "ok_Ellipses" routine
+144 144 0 0 24 36 .5 24 [0 0 0 1] ok_Ellipses
+144 144 0 76 18 60 3 6 [1 0 1 0] ok_Ellipses
+144 144 0 76 12 48 2 12 [.8 0 .8 0] ok_Ellipses
+144 144 0 78 11 44 2 12 [.6 0 .6 0] ok_Ellipses
+144 144 0 80 10 40 2 12 [.4 0 .4 0] ok_Ellipses
+144 144 0 82 9 36 2 12 [.2 0 .2 0] ok_Ellipses
+144 144 0 86 6 28 .5 24 [0 0 0 1] ok_Ellipses
+144 144 0 96 5 5 .5 12 [0 0 0 1] ok_Ellipses
+144 144 48 0 24 48 3 12 [1 0 1 0] ok_Ellipses
+144 144 48 0 22 46 3 12 [.9 0 .9 0] ok_Ellipses
+144 144 48 0 20 44 3 12 [.8 0 .8 0] ok_Ellipses
+144 144 48 0 18 42 3 12 [.7 0 .7 0] ok_Ellipses
+144 144 48 0 16 40 3 12 [.6 0 .6 0] ok_Ellipses
+144 144 48 0 14 38 3 12 [.5 0 .5 0] ok_Ellipses
+144 144 48 0 12 36 3 12 [.4 0 .4 0] ok_Ellipses
+144 144 48 0 10 34 3 12 [.3 0 .3 0] ok_Ellipses
+144 144 48 0 8 32 3 12 [.2 0 .2 0] ok_Ellipses
+144 144 48 0 8 30 3 12 [.1 0 .1 0] ok_Ellipses
+% EOF
+showpage

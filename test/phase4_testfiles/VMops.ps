@@ -1,0 +1,14 @@
+%VM operators test file
+
+/myarray [2 3 4] def
+myarray ==
+
+/save1 save def
+myarray 0 3 put
+myarray ==
+/save2 save def
+save1 restore
+
+myarray
+pstack
+quit

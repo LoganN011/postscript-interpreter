@@ -1,0 +1,58 @@
+%!
+0 setlinewidth
+% This is for an A4 page.
+
+% x y r n SierpinskiPentagon
+% Draw a Sierpinski pentagon recursively to a depth of N.  n=0 means one
+%   pentagon is drawn.
+/SierpinskiPentagon
+{
+   dup 0 eq
+   {
+      % Draw an actual pentagon.
+      gsave
+         newpath
+         pop
+         2 index 2 index translate
+         90 rotate dup 0 moveto
+         72 rotate dup 0 lineto
+         72 rotate dup 0 lineto
+         72 rotate dup 0 lineto
+         72 rotate dup 0 lineto
+         closepath
+         fill
+      grestore
+   }
+   {
+      % Recurse to draw 5 smaller pentagons.
+      3 index 3 index translate
+      1 72 cos 2 mul 2 add div 2 index mul   % Radius of smaller ones.
+      2 index 1 index sub                    % Radius to center of smaller ones
+      gsave
+         90 rotate dup 0 translate -90 rotate
+         0 0 3 index 5 index 1 sub SierpinskiPentagon
+      grestore gsave
+         90 72 add rotate dup 0 translate -90 rotate
+         0 0 3 index 5 index 1 sub SierpinskiPentagon
+      grestore gsave
+         90 144 add rotate dup 0 translate -90 rotate
+         0 0 3 index 5 index 1 sub SierpinskiPentagon
+      grestore gsave
+         90 216 add rotate dup 0 translate -90 rotate
+         0 0 3 index 5 index 1 sub SierpinskiPentagon
+      grestore gsave
+         90 288 add rotate dup 0 translate -90 rotate
+         0 0 3 index 5 index 1 sub SierpinskiPentagon
+      grestore
+      pop pop pop
+   } ifelse
+   pop pop pop
+} def
+
+595.275597 2 div
+841.8897729 2 div
+595.275597 2 div 36 sub
+6 SierpinskiPentagon
+
+
+showpage

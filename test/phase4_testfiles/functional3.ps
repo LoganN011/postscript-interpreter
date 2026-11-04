@@ -1,0 +1,79 @@
+%	(* original SML code: *)
+%	let
+%	    val f = fn x =>
+%		let
+%		    val h = fn y => 2 * x + 3 * y
+%		in
+%		    h
+%		end
+%	in
+%	    let
+%		val g = f 3
+%	    in
+%		g 2
+%	    end
+%	end
+%	(* result is 12 *)
+%	
+%	
+%	(* equivalent code after closure conversion (not typable in ML - circularity): *)
+%	fun select_0_code {code} = code
+%	fun select_1_code {code,fv1} = code
+%	fun select_1_fv1 {code,fv1} = fv1
+%	let
+%	    val f =
+%		let
+%		    val d = fn (clo, x) =>
+%			let
+%			    val h' = fn (clo, y) => 2 * (select_1_fv1 clo) + 3 * y
+%			in
+%			    {code=h',fv1=x}
+%			end
+%		in
+%		    {code=d}
+%		end
+%	in
+%	    let
+%		val g = (select_0_code f) (f, 3)
+%	    in
+%		(select_1_code g) (g, 2)
+%	    end
+%	end
+
+/text 0 dict def
+
+text
+begin
+	/f
+	[
+	    {%fn (c, x)
+		[
+		    {%fn (c, y)
+			2
+			1 index 1 get	%(select_1_a1 c)
+			mul
+			3
+			3 index		%y
+			mul
+			add
+			3 1 roll 2 {pop} repeat	%return
+		    } %h'
+		    3 index	%x
+		]
+		3 1 roll 2 {pop} repeat %return
+	    } %d
+	] def
+end
+
+
+/localdict 0 dict def
+
+localdict
+begin
+    /g 3 text /f get dup 0 get exec def
+    2 g dup 0 get exec
+end
+=
+
+%prints 12
+quit

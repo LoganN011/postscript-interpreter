@@ -1,0 +1,28 @@
+%Team Green
+%Gloria Chen
+%Angeline Madrid
+%Alex
+
+1234 4321 eq 			%false
+1212121 1212121 eq pstack	%true
+clear
+0 0 ne 				%false
+432 0 ne pstack			%true
+clear
+87 112 ge 			%false
+87 66 ge 			%true
+87 87 ge pstack			%true
+clear
+4.00125 4.005 gt		%false
+4.00125 4.00125 gt		%false
+4.00125 4 gt pstack		%true
+clear
+8001.33 10 le 			%false
+8.00133 10 le			%true
+8.00133 8.00133	le		%true
+clear
+4.00125 4.005 lt		%true
+4.00125 4.00125 lt		%false
+4.00125 4 lt pstack		%false
+clear
+quit

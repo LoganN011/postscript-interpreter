@@ -1,0 +1,55 @@
+%!PS-Adobe-2.0
+%%Title: The Sierpinski Triangle
+%%Creator: Alena Lacova, NIKHEF-H
+%%CreationDate: 19-jun-1992
+%%Pages: 1
+%%EndComments
+%%BeginProlog
+/setgray {dup dup setrgbcolor} def %%DS%%
+
+/s3  3 sqrt  def
+/h { s3 2 div len mul } def %height of triangle
+/lp {len 2 div } def
+/triangle { %def 
+	0 0 moveto len 0 rlineto lp neg h rlineto 
+	closepath fill 
+} def
+/_tr { %def
+	len 0 moveto lp h rlineto len neg 0 rlineto 
+	closepath fill 
+} bind def
+/sum { %def
+	0 exch 1 exch 1 exch { 
+		2 exch exp add 
+	} bind for 
+	/s exch cvi def 
+} bind def
+/x_tr { len 0 translate _tr } bind def
+/y_tr {lp h translate _tr } bind def
+
+%%EndProlog
+%%Page: 0 1
+/len 500 def
+50 100 translate
+triangle
+1 setgray
+
+1 1 7 { %for
+  dup /i exch def sum /j s def
+  /len lp def
+  gsave i {_tr} repeat grestore
+  i 2 ge { %if
+      _tr
+      gsave s {x_tr} repeat grestore 
+      gsave 
+	s { %repeat
+	   y_tr 
+	   gsave 
+		j 1 ge {j 1 sub {x_tr} repeat /j j 1 sub def} if 
+	   grestore 
+	} repeat 
+      grestore
+  } if
+} for
+showpage
+%%Trailer

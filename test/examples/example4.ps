@@ -1,0 +1,12 @@
+/inch {72 mul} def
+newpath
+2 inch 8 inch moveto
+0.7 0.7 0.7 setrgbcolor
+300 300 translate
+0 30 360 {%for
+  pop
+  0 -50 moveto 200 0 lineto 0 50 lineto
+  30 rotate
+} for
+stroke
+showpage

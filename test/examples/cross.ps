@@ -1,0 +1,42 @@
+%!
+% A Sierpinski-like fractal.
+% By John Fouhy.
+
+/cross { newpath length 3 div x add y moveto 0 length rlineto closepath stroke
+         newpath length 3 div 2 mul x add y moveto 0 length rlineto closepath stroke
+         newpath x length 3 div y add moveto length 0 rlineto closepath stroke
+         newpath x length 3 div 2 mul y add moveto length 0 rlineto closepath stroke
+} def
+
+/square { /l exch def /b exch def /a exch def newpath a b moveto l 0 rlineto 0 l rlineto l neg 0 rlineto closepath stroke } def
+
+/rec { /depth exch def
+       /length exch def
+       /y exch def
+       /x exch def
+       /newlength length 3 div def
+       /newdepth depth 1 add def
+       cross
+       depth maxdepth lt
+       {
+           x y newlength newdepth
+           x 2 newlength mul add y newlength newdepth
+           x newlength add y newlength add newlength newdepth
+           x y 2 newlength mul add newlength newdepth
+           x 2 newlength mul add y 2 newlength mul add newlength newdepth
+           rec rec rec rec rec
+       } if
+} def
+
+0 setlinewidth
+/maxdepth 5 def
+/initlength 500 def
+/xinit 60 def
+/yinit 300 def
+
+xinit yinit initlength square
+xinit yinit initlength 0 rec
+%/x xinit def
+%/y yinit def
+%/length initlength def
+%cross

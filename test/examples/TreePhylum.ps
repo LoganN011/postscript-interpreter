@@ -1,0 +1,70 @@
+%!PS
+% TreePhylum.ps
+%
+% By John Holder, 19-Jan-1998
+%
+% for fun, try rang1=12 rang2=5
+% and change -1 in incang1 to a -2, or -2.25 or such.
+
+/findfont {} def %%DS%%
+/scalefont {pop} def %%DS%%
+/setfont {pop} def %%DS%%
+/string {} def %%DS%%
+/cvs {pop} def %%DS%%
+/show {pop} def %%DS%%
+
+0 setlinewidth
+
+/Helvetica findfont 8 scalefont setfont
+/dah {dup} def
+/dey {dup} def
+/inch {72 mul} def
+/num {1} def
+/incnum {/num num 1 add def} def
+/prt-n {7 string cvs show} def
+/ang1 {-1} def
+/ang2 {-2 ang1 mul} def
+/incang1 {/ang1 ang1 -1 add def} def
+/linelen {.5 inch} def
+/rot1 {/rang1 rang1 -1 mul def} def
+/depth 0 def
+/maxdepth 8 def
+/down {/depth depth 1 add def} def
+/up {/depth depth 1 sub def} def
+
+/DoLine 
+{ rang1 rang2 add rotate
+  0 linelen rlineto 
+  currentpoint stroke 
+  translate 0 0 moveto 
+} def
+
+/Tree
+{ gsave 
+  .62 .62 scale
+  2 setlinewidth
+  down rot1 DoLine
+  depth maxdepth le
+  { ang1 rotate Tree
+    ang2 rotate Tree
+  } if
+  up
+  grestore 
+} def
+
+684 -72 36 
+{ dah dey dah dey dup dah dup dey dah
+  18 72 540 
+  { exch moveto num prt-n incnum
+    /rang1 {0} def
+    /rang2 {0} def
+    gsave
+      0.3 inch 0 inch rmoveto Tree
+    grestore
+    incang1
+  } for
+} for
+
+3.8 inch 10.5 inch moveto (Tree Phylum) show
+stroke
+showpage

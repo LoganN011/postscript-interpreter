@@ -1,0 +1,437 @@
+%!PS-Adobe-3.0 EPSF-3.0
+
+0.1 0.1 scale
+
+
+
+64 dict begin
+/findfont {} def %%DS%%
+/scalefont {pop} def %%DS%%
+/setfont {pop} def %%DS%%
+/show {pop} def %%DS%%
+
+/square
+{
+    dup 0 rlineto
+    dup 0 exch rlineto
+    0 exch sub 0 rlineto
+    closepath
+} def
+/rowframe
+{
+    {
+	dup square
+	dup 0 rmoveto
+    }
+    repeat
+    pop
+} def
+/boardframe
+{
+    {
+	currentpoint 4 2 roll 2 copy rowframe 4 2 roll moveto
+	exch dup 0 exch rmoveto exch
+    }
+    repeat
+    pop pop
+} def
+/plainandandnotgate
+{
+    newpath
+    99 227 moveto
+    3 {36 square 0 36 rmoveto} repeat
+    0 36 rmoveto
+    3 {36 square 0 36 rmoveto} repeat
+    36 -4 36 mul rmoveto
+    4 {36 square 36 0 rmoveto} repeat
+    stroke
+    117 129 100 80 100 arcn
+    stroke
+    117 578 100 260 280 arcn
+    stroke
+    378 353.5 100 170 190 arcn
+    stroke
+    /Helvetica findfont 150 scalefont setfont
+    220 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    1 0 0 setrgbcolor
+    360 300 moveto show
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    90 540 moveto show
+    0 0 0 setrgbcolor
+} def
+/plainandgate
+{
+    newpath
+    99 227 moveto
+    3 {36 square 0 36 rmoveto} repeat
+    0 36 rmoveto
+    3 {36 square 0 36 rmoveto} repeat
+    36 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    stroke
+    117 129 100 80 100 arcn
+    stroke
+    117 578 100 260 280 arcn
+    stroke
+    /Helvetica findfont 150 scalefont setfont
+    280 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    90 540 moveto show
+    0 0 0 setrgbcolor
+} def
+/plainyesgate
+{
+    newpath
+    99 227 moveto
+    3 {36 square 0 36 rmoveto} repeat
+    36 36 rmoveto
+    0 3 36 mul rlineto
+    0 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    stroke
+    117 129 100 80 100 arcn
+    stroke
+    /Helvetica findfont 150 scalefont setfont
+    280 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    0 0 0 setrgbcolor
+} def
+/plainonegate
+{
+    newpath
+    135 227 moveto
+    0 7 36 mul rlineto
+    0 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    stroke
+    /Helvetica findfont 150 scalefont setfont
+    270 160 moveto show
+} def
+/activeandandnotgate
+{
+    newpath
+    3 setlinewidth
+    0 1 0 setrgbcolor
+    135 227 moveto
+    0 3 36 mul rlineto
+    0 36 rmoveto
+    0 3 36 mul rlineto
+    0 -4 36 mul rmoveto
+    4 {36 square 36 0 rmoveto} repeat
+    stroke
+    68 215 moveto
+    -3 3 36 mul 0.9 mul rlineto
+    68 491 moveto
+    -3 -3 36 mul 0.9 mul rlineto
+    115 255 moveto
+    0 180 rlineto
+    stroke
+    117 129 100 80 120 arcn
+    stroke
+    117 578 100 240 280 arcn
+    stroke
+    378 353.5 100 170 190 arcn
+    stroke
+    /Helvetica-Bold findfont 80 scalefont setfont
+    85 420 moveto
+    (F) show
+    /Helvetica findfont 150 scalefont setfont
+    0 0 0 setrgbcolor
+    220 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    1 0 0 setrgbcolor
+    360 300 moveto show
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    90 540 moveto show
+    0 0 0 setrgbcolor
+} def
+/activeandgate
+{
+    newpath
+    3 setlinewidth
+    0 1 0 setrgbcolor
+    135 227 moveto
+    0 3 36 mul rlineto
+    0 36 rmoveto
+    0 3 36 mul rlineto
+    0 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    68 215 moveto
+    -3 3 36 mul 0.9 mul rlineto
+    68 491 moveto
+    -3 -3 36 mul 0.9 mul rlineto
+    115 255 moveto
+    0 180 rlineto
+    stroke
+    117 129 100 80 120 arcn
+    stroke
+    117 578 100 240 280 arcn
+    stroke
+    /Helvetica-Bold findfont 70 scalefont setfont
+    85 420 moveto
+    (F) show
+    /Helvetica findfont 150 scalefont setfont
+    0 0 0 setrgbcolor
+    280 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    90 540 moveto show
+    0 0 0 setrgbcolor
+} def
+/activeyesgate
+{
+    newpath
+    3 setlinewidth
+    0 1 0 setrgbcolor
+    135 227 moveto
+    0 3 36 mul rlineto
+    0 36 rmoveto
+    0 3 36 mul rlineto
+    0 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    68 215 moveto
+    -3 3 36 mul 0.9 mul rlineto
+    115 255 moveto
+    0 180 rlineto
+    stroke
+    117 129 100 80 120 arcn
+    stroke
+    /Helvetica-Bold findfont 70 scalefont setfont
+    85 420 moveto
+    (F) show
+    /Helvetica findfont 150 scalefont setfont
+    0 0 0 setrgbcolor
+    280 70 moveto show
+    /Helvetica-Bold findfont 150 scalefont setfont
+    0 0.690 0 setrgbcolor
+    90 70 moveto show
+    0 0 0 setrgbcolor
+} def
+/activeonegate
+{
+    newpath
+    3 setlinewidth
+    0 1 0 setrgbcolor
+    135 227 moveto
+    0 3 36 mul rlineto
+    0 36 rmoveto
+    0 3 36 mul rlineto
+    0 -4 36 mul rmoveto
+    3 {36 square 36 0 rmoveto} repeat
+    115 255 moveto
+    0 180 rlineto
+    stroke
+    /Helvetica-Bold findfont 70 scalefont setfont
+    85 420 moveto
+    (F) show
+    /Helvetica findfont 150 scalefont setfont
+    0 0 0 setrgbcolor
+    270 160 moveto show
+} def
+/presentinput
+{
+    0 0 1 setrgbcolor
+    /Helvetica findfont 150 scalefont setfont
+    10 60 moveto
+    (i) show
+    /Helvetica findfont 100 scalefont setfont
+    0 -40 rmoveto
+    show
+    0 0 0 setrgbcolor
+} def
+/activewell
+{
+    1200 0 translate exec
+    -600 0 translate exec
+    -600 0 translate exec
+    1200 700 translate exec
+    -600 0 translate exec
+    -600 0 translate exec
+    1600 800 translate exec
+    -300 0 translate exec
+    -300 0 translate exec
+    -300 0 translate exec
+    -700 60 translate 50 0 moveto
+    /Helvetica findfont 140 scalefont setfont
+    show
+    0 -1560 translate
+} def
+/offset
+{
+    dup 1 eq {pop -600} {2 eq {1000} {2600} ifelse} ifelse
+} def
+/activeboard_with_well_highlight
+{
+    newpath
+    100 100 moveto
+    5 setlinewidth
+    1800 3 3 boardframe stroke
+    3700 100 translate exec
+    -1800 0 translate exec
+    -1800 0 translate exec
+    3600 1800 translate exec
+    -1800 0 translate exec
+    -1800 0 translate exec
+    3600 1800 translate exec
+    -1800 0 translate exec
+    -1800 0 translate exec
+    -100 -3700 translate
+    offset exch offset exch
+    2 copy translate
+    2 2 scale
+    3 -1 roll
+    newpath 0 0 moveto 1800 square 1 1 1 setrgbcolor fill
+    0 0 moveto 1800 square 0 0 0 setrgbcolor 10 setlinewidth stroke
+    exec
+    0.5 0.5 scale
+    neg exch neg exch
+    translate
+} def
+%%EndProlog
+/well1
+{
+	(Well 1)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{}
+	{(4) (g24) plainyesgate}
+	{}
+	{}
+	{}
+	{}
+	activewell
+} def
+/well2
+{
+	(Well 2)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{(6) (7) (2) (g23) activeandandnotgate}
+	{}
+	{}
+	{(7) (9) (1) (g17) plainandandnotgate}
+	{(8) (9) (1) (g18) plainandandnotgate}
+	{}
+	activewell
+} def
+/well3
+{
+	(Well 3)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{}
+	{(1) (6) (g22) activeandgate}
+	{}
+	{}
+	{(4) (9) (g25) plainandgate}
+	{}
+	activewell
+} def
+/well4
+{
+	(Well 4)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{}
+	{(1) (g21) activeyesgate}
+	{}
+	{}
+	{}
+	{}
+	activewell
+} def
+/well5
+{
+	(Well 5)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{}
+	{(g20) activeonegate}
+	{}
+	{}
+	{}
+	{}
+	activewell
+} def
+/well6
+{
+	(Well 6)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{(1) (2) (6) (g1) plainandandnotgate}
+	{(1) (3) (6) (g2) plainandandnotgate}
+	{}
+	{(1) (7) (6) (g2) plainandandnotgate}
+	{(1) (8) (6) (g2) plainandandnotgate}
+	{(1) (9) (6) (g2) plainandandnotgate}
+	activewell
+} def
+/well7
+{
+	(Well 7)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{(2) (6) (7) (g6) plainandandnotgate}
+	{(6) (8) (7) (g7) plainandandnotgate}
+	{}
+	{(6) (9) (7) (g8,16) plainandandnotgate}
+	{(9) (2) (1) (g19) plainandandnotgate}
+	{}
+	activewell
+} def
+/well8
+{
+	(Well 8)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{}
+	{(9) (7) (4) (g9) plainandandnotgate}
+	{}
+	{}
+	{}
+	{}
+	activewell
+} def
+/well9
+{
+	(Well 9)
+	{(1) presentinput}
+	{(6) presentinput}
+	{(7) presentinput}
+	{(8) presentinput}
+	{(7) (8) (4) (g10) activeandandnotgate}
+	{(4) (2) (9) (g11) plainandandnotgate}
+	{(4) (3) (9) (g12) plainandandnotgate}
+	{(4) (6) (9) (g13) plainandandnotgate}
+	{(4) (7) (9) (g14) plainandandnotgate}
+	{(4) (8) (9) (g15) plainandandnotgate}
+	activewell
+} def
+{well9} 0 1 {well1} {well2} {well3} {well4} {well5} {well6} {well7} {well8} {well9} activeboard_with_well_highlight
+end
+%%EndProlog
+showpage

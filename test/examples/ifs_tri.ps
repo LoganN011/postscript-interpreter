@@ -1,0 +1,70 @@
+%!
+/problistcreate { % construct an array of 128 transformations, according to the probabilities.
+    mark
+    /counter 0 def
+    probabilities % forall elements of 'probabilities' ...
+    {
+        128 mul round cvi % ... multiply them by 128, and round to the nearest integer ...
+        {
+            transforms counter get % ... then push that many copies of the appropriate transformation onto the stack .
+        } repeat
+        /counter counter 1 add def
+    } forall
+
+    counttomark % count the number of elements we have just pushed onto the stack.
+    128 sub neg dup 0 gt
+    {
+        {
+            [1 0 0 1 0 0] % If there are too few, push copies of this transformation on until we have 128.
+        } repeat
+    }
+    {
+        pop % else just get rid of the extra number.
+    } ifelse
+    ] % construct the array.
+
+    /problist exch def
+} bind def
+%
+/doit {
+    problistcreate
+
+    % First, do 200 initial moves, to get away from the starting point and close to the attractor.
+    1 1 % "home" position
+    200
+    {
+        problist rand -24 bitshift get transform % get a random transformation from problist and transform
+        2 copy moveto % copy the two top elements on the stack (ie: 1 1), and then move to that position.
+        0.001 10 rlineto % Move 0.001 across and 10 up.
+        % Note no stroke --> not drawing anything.
+    } repeat
+
+    newpath
+
+    numdots  % Do the same, but now we are drawing.
+    {
+        problist rand -24 bitshift get transform
+        2 copy moveto
+        0.001 0 rlineto
+        stroke
+    } repeat
+} bind def
+%
+/numdots 600000 def
+%
+/transforms[
+[.5 0 0 .5 0 0]
+[.5 0 0 .5 4 0]
+[.5 0 0 .5 2 4]
+] def
+%
+/probabilities [.33 .33 .34] def
+%
+1 setlinecap
+0 setlinewidth
+200 300 translate
+30 dup scale
+doit
+showpage
+quit
+

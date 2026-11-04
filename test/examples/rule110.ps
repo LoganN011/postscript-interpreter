@@ -1,0 +1,93 @@
+%!
+% This program illustrates simple one-dimensional cellular automata
+% (as in Wolfram's book).  This comments give instructions.
+% To see the output, just print on any postscript printer,
+% or view with a postscript previewer.  This is a very inefficient
+% way to do large computations, but works fine for small ones.
+%
+% Henry Cohn
+
+/bound 599 def
+% The array has cells indexed from 0 to bound (and wraps around
+% at the edges).  Note that it therefore has bound+1 cells.
+
+/size 0.75 def
+% This is the size of the cells in the output.
+
+/timebound 600 def
+% This is how many time steps to take.
+
+/rule [0 1 1 1 0 1 1 0] def
+% This is the backwards binary expansion of the rule number
+% (out of Wolfram's 256 rules).  For example,
+% [0 1 1 1 0 1 1 0] is rule 110 and [0 1 1 1 1 0 0 0] is rule 30.
+
+/outlines 0 def
+% This variable is 1 if you want white cells drawn with a box
+% around them, and 0 otherwise.  The box makes it easier to see
+% what is happening if you are looking at individual cells, but
+% it really gets in the way in big pictures.
+
+/randomize 1 def
+% This is 1 or 0 depending on whether you want to start with
+% pseudorandom initial conditions, or just a single black square.
+% (Below, you can customize your initial conditions.)
+
+/x 40 def
+/y 700 def
+% These are the x and y coordinates of the upper left corner
+% of the output.
+
+/time 0 def
+/cells bound 1 add array def
+/newcells bound 1 add array def
+
+0 setlinewidth
+
+/drawcells {
+  0 1 bound {
+    /i exch def
+    x i size mul add y time size mul sub moveto
+    cells i get 0 eq
+      {outlines 1 eq {size 0 rlineto 0 size rlineto size -1 mul 0 rlineto 0 size -1 mul rlineto stroke} if}
+      {size 0 rlineto 0 size rlineto size -1 mul 0 rlineto 0 size -1 mul rlineto fill stroke}
+    ifelse
+  } for
+} bind def
+
+/updatecells {
+  0 1 bound {
+    /i exch def
+    /b cells i get def
+    i 0 eq
+      {/a cells bound get def}
+      {/a cells i 1 sub get def}
+    ifelse
+    i bound eq
+      {/c cells 0 get def}
+      {/c cells i 1 add get def}
+    ifelse
+    newcells i rule c b 2 mul add a 4 mul add get put
+  } for
+  0 1 bound {
+    /i exch def
+    cells i newcells i get put
+  } for
+} bind def
+
+randomize 0 eq
+  {0 1 bound {cells exch 0 put} for cells bound 2 idiv 1 put}
+  {0 1 bound {cells exch rand 2 mod put} for}
+ifelse
+% Put your own initial conditions here.  One way is by uncommenting
+% the following line (i.e., removing the %):
+%/cells [0 1 1 0 1 1 1] def
+% Make sure to include the proper number of 0's and 1's, or there
+% will be trouble.  (The proper number is bound+1.)
+
+0 1 timebound {
+  drawcells
+  updatecells
+  /time time 1 add def
+} for
+showpage

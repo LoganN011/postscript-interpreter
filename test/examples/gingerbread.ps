@@ -1,0 +1,105 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Title: Gingerbread Man
+%%Creator: Eric Marsden  <emarsden@mail.dotcom.fr>
+%%Pages: 1
+%%Orientation: Portrait
+%%PaperSize: A4
+%%EndComments
+
+/minxx 0 def
+/minyy 0 def
+/maxxx 0 def
+/maxyy 0 def
+/xxrange 1 def
+/yyrange 1 def
+/minX 0 def
+/minY 0 def
+/maxX 595 def
+/maxY 842 def
+/Xrange maxX minX sub def
+/Yrange maxY minY sub def
+
+/sx { minxx sub xxrange div Xrange mul minX add } def
+/sy { minyy sub yyrange div Yrange mul minY add } def
+/wx { minX sub Xrange div xxrange mul minxx add } def
+/wy { minY sub Yrange div yyrange mul minyy add } def
+/setExtent { % x1 y1 x2 y2 --
+   /maxyy exch def /maxxx exch def
+   /minyy exch def /minxx exch def
+   /xxrange { maxxx minxx sub } def
+   /yyrange { maxyy minyy sub } def
+} def
+
+/drawPoint {
+   %2dup moveto 1 1 rlineto stroke
+   moveto 1 1 rlineto stroke
+} def
+/scalePoint {
+   sy exch sx exch
+} def
+/scaleToWin {                 % i j -- x y
+   wy exch                    % y i
+   wx exch                    % x y
+} def
+
+/pset { scalePoint drawPoint } def
+%%DS%%/2dup { 1 index 1 index } def
+/twodup { 1 index 1 index } def %%DS%%
+
+%% --------------------------------------------------------------------
+
+%% start at -0.123, 0.001
+%% gingerBreadIter  x y -- x' y'
+%%    where x' = 1-y+|x|
+%%          y' = x
+%%  in forth: fnegate 1e0 f+
+%% fover fabs f+ fswap
+/gingerbreadIter {  % x y -- x' y'
+   neg 1 add                             %% x 1-y
+   1 index abs add exch
+} def
+
+/doGingerbread {      % --
+   -4 -4 8 8 setExtent   
+   -0.1 0.0
+   /i 0 def
+   20000 {
+      gingerbreadIter
+      i 1000 mod 1000 div 1 1 sethsbcolor
+%%DS%%      2dup pset
+      twodup pset %%DS%%
+      i 1 add /i exch def
+   } repeat
+   pop pop
+} def
+
+
+%% x y -- x' y'
+%% where x' = x*x-1.4 + y + 1
+%%       y' = x * 0.3
+%% forth: fover fdup f* -1.4 f*
+%% f+ 1 f+ fswap 0.3 f*
+/henonIter {
+   1 index dup mul -1.4 mul
+   add 1 add exch 0.3 mul
+} def
+
+/doHenon {
+  -1.4 -0.9 1.4 0.9 setExtent
+  -0.1 0.03
+   5000 {
+      henonIter
+      2dup pset
+   } repeat
+} def
+
+%%EndProlog  ----------------------------------------------
+
+1.0 setlinewidth
+doGingerbread
+%doHenon
+showpage
+
+%%Trailer
+%%end
+%%EOF

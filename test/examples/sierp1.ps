@@ -1,0 +1,38 @@
+%!
+0 setlinewidth
+% This is for an A4 page.
+
+% x y xs ys n SierpinskiGasket
+% Draw a Sierpinski gasket recursivelly to a depth of N.
+/SierpinskiGasket
+{
+   dup 1 eq
+   {
+      % Draw an actual triangle.
+      gsave
+         newpath
+         pop
+         3 index 3 index moveto
+         1 index 0 rlineto
+         1 index 2 div neg 1 index rlineto
+         fill
+      grestore
+   }
+   {
+      % Recurse to draw 3 smaller gaskets.
+      4 index 4 index 4 index 2 div 4 index 2 div
+      4 index 1 sub SierpinskiGasket      % Left
+      4 index 3 index 2 div add 4 index 4 index 2 div 4 index 2 div
+      4 index 1 sub SierpinskiGasket      % Right
+      4 index 3 index 4 div add 4 index 3 index 2 div add
+      4 index 2 div 4 index 2 div
+      4 index 1 sub SierpinskiGasket      % Top
+      pop
+   } ifelse
+   pop pop pop pop
+} def
+
+72 225.54 451.27 390.81 10 SierpinskiGasket
+
+
+showpage

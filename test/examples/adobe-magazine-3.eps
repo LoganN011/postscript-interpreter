@@ -1,0 +1,153 @@
+%!PS-Adobe-3.0 EPSF-3.0
+
+
+/setcmykcolor {pop setrgbcolor} def  %%DS
+
+
+
+                
+%%BoundingBox:0 0 288 288
+userdict begin
+        /ok_EllipseDict 50 dict def
+end
+ok_EllipseDict begin
+        /ok_Ellipse
+        {
+                ok_xOffset ok_yOffset moveto
+                ok_x1 0 ok_xR ok_y1 ok_xR ok_yR rcurveto
+                0 ok_y1 ok_x1 neg ok_yR ok_xR neg ok_yR rcurveto
+                ok_x1 neg 0 ok_xR neg ok_y1 neg ok_xR neg ok_yR neg rcurveto
+                0 ok_y1 neg ok_x1 ok_yR neg ok_xR ok_yR neg rcurveto
+                closepath
+        } def
+        /ok_Ellipses
+        {
+                %on stack:
+                %xCenter yCenter xOffset yOffset width height weight howMany [color array]
+                aload pop setcmykcolor
+                /ok_HowMany exch def
+                /ok_Weight exch def
+                /ok_Height exch def
+                /ok_Width exch def
+                /ok_yOffset exch def
+                /ok_xOffset exch def
+                /ok_yCenter exch def
+                /ok_xCenter exch def
+                /ok_Angle 360 ok_HowMany div def
+                /ok_xR ok_Width 2 div def
+                /ok_yR ok_Height 2 div def
+                /ok_x1 ok_xR ok_xR .552292 mul sub def
+                /ok_y1 ok_yR ok_yR .552292 mul sub def
+                ok_Weight setlinewidth
+                gsave
+                ok_xCenter ok_yCenter translate
+                ok_HowMany
+                {
+                        ok_Ellipse
+                        ok_Angle rotate
+                } repeat
+                stroke
+                grestore
+        } def
+        /ok_EllipsesTwo
+        {
+                %on stack:
+                %xCenter yCenter xOffset yOffset width height weight angle initAngle howMany [color array]
+                aload pop setcmykcolor
+                /ok_HowMany exch def
+                /ok_InitialAngle exch def
+                /ok_Angle exch def
+                /ok_Weight exch def
+                /ok_Height exch def
+                /ok_Width exch def
+                /ok_yOffset exch def
+                /ok_xOffset exch def
+                /ok_yCenter exch def
+                /ok_xCenter exch def
+                /ok_xR ok_Width 2 div def
+                /ok_yR ok_Height 2 div def
+                /ok_x1 ok_xR ok_xR .552292 mul sub def
+                /ok_y1 ok_yR ok_yR .552292 mul sub def
+                ok_Weight setlinewidth
+                gsave
+                ok_xCenter ok_yCenter translate
+                ok_InitialAngle rotate
+                ok_HowMany
+                {
+                        ok_Ellipse
+                        ok_Angle rotate
+                } repeat
+                stroke
+                grestore
+        } def
+        /ok_EllipsesThree
+        {
+                %on stack:
+                %xCenter yCenter xOffset yOffset width height weight angle initAngle scale howMany tint? direction? [color array]
+                /ok_Color exch def
+                ok_Color aload pop setcmykcolor
+                /ok_Direction exch def
+                /ok_Tint exch def
+                /ok_HowMany exch def
+                /ok_Scale exch def
+                /ok_InitialAngle exch def
+                /ok_Angle exch def
+                /ok_Weight exch def
+                /ok_Height exch def
+                /ok_Width exch def
+                /ok_yOffset exch def
+                /ok_xOffset exch def
+                /ok_yCenter exch def
+                /ok_xCenter exch def
+                /ok_xR ok_Width 2 div def
+                /ok_yR ok_Height 2 div def
+                /ok_x1 ok_xR ok_xR .552292 mul sub def
+                /ok_y1 ok_yR ok_yR .552292 mul sub def
+                ok_Weight setlinewidth
+                gsave
+                ok_xCenter ok_yCenter translate
+                ok_InitialAngle rotate
+                /ok_TintChange 1 ok_HowMany 100 div .1 mul sub def
+                ok_HowMany
+                {
+                        ok_Ellipse
+                        stroke
+                        newpath
+                        ok_Direction
+                        {
+                                ok_Angle rotate
+                        }
+                        {
+                                ok_Angle neg rotate
+                        } ifelse
+                        /ok_yAdjust ok_Height ok_Scale mul 2 div def
+                        /ok_yOffset ok_yOffset ok_yAdjust add def
+                        /ok_Width ok_Width ok_Width ok_Scale mul sub def
+                        /ok_Height ok_Height ok_Height ok_Scale mul sub def
+                        /ok_xR ok_Width 2 div def
+                        /ok_yR ok_Height 2 div def
+                        /ok_x1 ok_xR ok_xR .552292 mul sub def
+                        /ok_y1 ok_yR ok_yR .552292 mul sub def
+                        ok_Tint
+                        {
+                                ok_Color {ok_TintChange mul} forall 4 array astore 
+                                /ok_Color exch def
+                                ok_Color aload pop setcmykcolor
+                        } if
+                } repeat
+                grestore
+        } def
+end
+ok_EllipseDict begin
+%xCenter yCenter xOffset yOffset width height weight angle initAngle scale howMany tint? direction? [color array]
+        144 144 0 36 36 72 0.2 2 45 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 90 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 135 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 180 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 225 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 270 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 315 .1 40 true false [0 0 0 1] ok_EllipsesThree
+        144 144 0 36 36 72 0.2 2 360 .1 40 true false [0 0 0 1] ok_EllipsesThree
+end
+% % EOF
+showpage

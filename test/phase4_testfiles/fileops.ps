@@ -1,0 +1,23 @@
+%File operators test file
+
+3
+4
+= %4
+== %3
+3 array
+pstack %[null null null]
+stack %-nostringval-
+clear
+1
+stack %1
+clear
+
+(myfile) (w) file
+2 write
+%(%stdin) (r) file
+%read
+1
+(string) print
+(myfile2) (w) file
+closefile
+quit

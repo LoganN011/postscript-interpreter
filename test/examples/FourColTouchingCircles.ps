@@ -1,0 +1,160 @@
+%!PS-Adobe-2.0
+%%Title:FourColTouchingCircles.ps
+%%Creator: Will Gilbert <wgilbert@UWaterloo.ca>
+%%CreationDate: July 1990, modified January 1993
+%%Origin: 0 0
+%%BoundingBox: 0.000 0.000 500.000 500.000
+%%EndComments
+
+/setcmykcolor {pop setrgbcolor} def  %%DS
+
+/white {0 0 0 0} def
+/black {0 0 0 1} def
+/red {0 1 1 0} def
+/cyan {1 0 0 0} def
+/magenta {0 1 0 0} def
+/green {1 0 1 0} def
+/yellow {0 0 1 0} def
+/blue {1 1 0 0} def
+
+/colarray [/yellow /white /cyan /white /green] def      
+                        %col shades for fill
+/maxdepth  6 def        %depth of iterations > 2
+/delta 0.00001 def      %underflow
+/depth 0 def
+/down {/depth depth 1 add def} def
+/up   {/depth depth 1 sub def} def
+
+/coldepth
+{%def   Sets col according to depth
+        %stack before:  
+        depth colarray length ge 
+                {white}{colarray depth get cvx exec} ifelse
+        %stack after: cmykcol   
+} def
+        
+/fillCircle  
+{%def   Fill circle xcenter ycenter radius with col
+        %stack before: cmykcol xcenter ycenter radius
+        3 copy
+        0 360 arc
+        gsave 
+                7 3 roll
+                setcmykcolor fill 
+        grestore stroke
+        %stack after: xcenter ycenter radius
+} def
+
+
+/invertPoint
+{%def   Invert point xp yp in circle xc yc rc
+        %stack before: xc yc rc xp yp
+        /yp exch def
+        /xp exch def
+        /rc exch def
+        /yc exch def
+        /xc exch def
+        /xp xp xc sub def
+        /yp yp yc sub def
+        rc dup mul
+        xp dup mul
+        yp dup mul add 
+        dup delta lt {pop 1} if %underflow
+        div dup                         %rc^2/(xp-xc)^2+(yp-yc)^2
+        xp mul
+        xc add                          %xinvpoint
+        exch
+        yp mul
+        yc add                          %yinvpoint
+        %stack after: xinvpoint yinvpoint
+} def
+
+/invertCircle
+{%def   Invert circle xx yy rr in circle x y r  
+        %stack before: x y r xx yy rr
+        /rr exch def
+        /yy exch def
+        /xx exch def
+        /r exch def
+        /y exch def
+        /x exch def
+        rr
+        xx x sub dup mul
+        yy y sub dup mul add sqrt 
+        dup delta lt {pop 1} if %underflow
+        div                             %rr/sqrt((xx-x)^2+(yy-y)^2)
+        dup
+        xx x sub mul dup
+        xx add /xa exch def
+        xx exch sub /xb exch def
+        yy y sub mul dup
+        yy add /ya exch def
+        yy exch sub /yb exch def
+        x y r xa ya invertPoint
+        /yai exch def
+        /xai exch def
+        x y r xb yb invertPoint
+        /ybi exch def
+        /xbi exch def
+        xai xbi add 2 div               %xinvcircle
+        yai ybi add 2 div               %yinvcircle
+        xai xbi sub dup mul
+        yai ybi sub dup mul add sqrt 2 div      %rinvcircle
+        %stack after: xinvcircle yinvcircle rinvcircle
+} def
+
+/invertThreeCircles
+{%def   Recursively inverts each circle in 3 others
+        %Outside circle is x0 y0 r0     
+        %stack before: x0 y0 r0 x1 y1 r1 x2 y2 r2 x3 y3 r3
+        /r3 exch def
+        /y3 exch def
+        /x3     exch def
+        /r2 exch def
+        /y2 exch def
+        /x2     exch def
+        /r1 exch def
+        /y1 exch def
+        /x1     exch def
+        /r0 exch def
+        /y0 exch def
+        /x0     exch def
+        down
+        x1 y1 r1
+        coldepth x1 y1 r1 x0 y0 r0 invertCircle fillCircle
+        coldepth x1 y1 r1 x2 y2 r2 invertCircle fillCircle
+        coldepth x1 y1 r1 x3 y3 r3 invertCircle fillCircle
+        x2 y2 r2
+        coldepth x2 y2 r2 x0 y0 r0 invertCircle fillCircle
+        coldepth x2 y2 r2 x1 y1 r1 invertCircle fillCircle
+        coldepth x2 y2 r2 x3 y3 r3 invertCircle fillCircle
+        x3 y3 r3 
+        coldepth x3 y3 r3 x0 y0 r0 invertCircle fillCircle
+        coldepth x3 y3 r3 x1 y1 r1 invertCircle fillCircle
+        coldepth x3 y3 r3 x2 y2 r2 invertCircle fillCircle
+        depth maxdepth 2 sub le
+        {%if    
+                3 {invertThreeCircles} repeat   %iterate
+        }{%else
+                36 {pop} repeat %remove 12 circles from stack
+        } ifelse
+        up
+        %stack after:
+} def
+
+%%EndProlog
+        
+2 setlinewidth
+coldepth 250 250 200 fillCircle                                  
+%outside circle
+down
+
+1.5 setlinewidth
+coldepth 300 190 121.898 fillCircle             %inside circle 1
+coldepth 219.85 370.6 75.6884 fillCircle        %inside circle 2
+coldepth 121.358 262.1941 70.7811 fillCircle %inside circle 3
+
+5 setlinewidth
+invertThreeCircles
+
+showpage
