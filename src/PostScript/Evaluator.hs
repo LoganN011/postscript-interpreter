@@ -8,7 +8,8 @@ module PostScript.Evaluator
 where
 
 import Control.Exception (SomeException, displayException, try)
-import Control.Monad.State (execStateT)
+import Control.Monad (unless)
+import Control.Monad.State (execStateT, gets)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import PostScript.Environment (lookupDict, push)
@@ -65,13 +66,23 @@ import PostScript.Primitives.Stack
     psExch,
     psIndex,
     psPop,
+    psPrint,
+    psPrintDebug,
+    psPrintEq,
     psPstack,
+    psQuit,
     psRoll,
   )
 import PostScript.Types (Interpreter, Object (..), PSState (..))
 
 evalProgram :: [Object] -> Interpreter ()
-evalProgram = mapM_ evalObject
+evalProgram [] = return ()
+evalProgram (x : xs) = do
+  term <- gets executionTerminated
+  unless term $ do
+    evalObject x
+    term' <- gets executionTerminated
+    unless term' (evalProgram xs)
 
 -- Evaluates a single PostScript object according to PostScript semantics
 evalObject :: Object -> Interpreter ()
@@ -104,7 +115,11 @@ executeBuiltin name = case name of
   "clear" -> psClear
   "count" -> psCount
   "pstack" -> psPstack
-  -- TODO: wire output ops: "=" -> psPrintEq, "==" -> psPrintDebug, "print" -> psPrint, "quit" -> psQuit
+  -- Output & Session Primitives
+  "=" -> psPrintEq
+  "==" -> psPrintDebug
+  "print" -> psPrint
+  "quit" -> psQuit
   -- Math Primitives
   "add" -> psAdd
   "sub" -> psSub

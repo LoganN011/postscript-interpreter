@@ -1,258 +1,218 @@
 module Main (main) where
 
+import Data.IORef (modifyIORef', newIORef, readIORef)
+import Data.List (isSuffixOf, sort)
 import PostScript.Evaluator (defaultSystemDict, runInterpreter)
 import PostScript.Lexer (parsePostScript)
+import PostScript.Primitives.Stack (formatObject)
 import PostScript.Types (Object (..), PSState (..), initPSState)
-import System.Exit (exitFailure, exitSuccess)
+import System.Directory (listDirectory)
+import System.Exit (ExitCode (..), exitFailure, exitSuccess)
+import System.FilePath (takeFileName, (</>))
+import System.Process (readProcessWithExitCode)
 import Test.QuickCheck
+import Text.Read (readMaybe)
 
-
--- | Parse and evaluate a raw PostScript string from the root system state.
-evalScript :: String -> IO (Either String [Object])
+-- | Parse and evaluate PostScript code, capturing stdout and returning (output, finalStack).
+evalScript :: String -> IO (Either String (String, [Object]))
 evalScript code = case parsePostScript code of
   Left err -> pure (Left ("Parse error: " ++ err))
   Right objs -> do
-    let s0 = initPSState {dictStack = [defaultSystemDict]}
+    outRef <- newIORef []
+    let s0 = initPSState
+          { dictStack   = [defaultSystemDict]
+          , printAction = \s -> modifyIORef' outRef (s :)
+          }
     res <- runInterpreter objs s0
-    pure (fmap operandStack res)
+    case res of
+      Left err -> pure (Left err)
+      Right st -> do
+        out <- concat . reverse <$> readIORef outRef
+        pure (Right (out, operandStack st))
 
--- | Read a .ps file from disk and execute it to completion.
-evalFile :: FilePath -> IO (Either String [Object])
-evalFile path = do
-  source <- readFile path
-  evalScript source
+-- | Read and execute a .ps file from disk.
+evalFile :: FilePath -> IO (Either String (String, [Object]))
+evalFile path = readFile path >>= evalScript
 
+-- | Helper for asserting that running a script leaves expected objects on the stack.
+runsTo :: String -> [Object] -> Property
+runsTo code expected = ioProperty $ do
+  res <- evalScript code
+  pure (fmap snd res == Right expected)
 
--- Stack: 'x dup pop' leaves 'x' on the stack
+-- QuickCheck Properties
 prop_dupPop :: Int -> Property
-prop_dupPop x = ioProperty $ do
-  res <- evalScript (show x ++ " dup pop")
-  pure (res == Right [PSInteger x])
+prop_dupPop x = (show x ++ " dup pop") `runsTo` [PSInteger x]
 
--- Stack: 'x y exch exch' preserves the original stack order
 prop_exchTwice :: Int -> Int -> Property
-prop_exchTwice x y = ioProperty $ do
-  res <- evalScript (show x ++ " " ++ show y ++ " exch exch")
-  pure (res == Right [PSInteger y, PSInteger x])
+prop_exchTwice x y = (show x ++ " " ++ show y ++ " exch exch") `runsTo` [PSInteger y, PSInteger x]
 
--- Stack: 'dup add' is equivalent to doubling
 prop_dupAddDoubles :: Int -> Property
-prop_dupAddDoubles x = ioProperty $ do
-  res <- evalScript (show x ++ " dup add")
-  pure (res == Right [PSInteger (x * 2)])
+prop_dupAddDoubles x = (show x ++ " dup add") `runsTo` [PSInteger (x * 2)]
 
--- Stack: 'count' accurately reports number of pushed items
 prop_countMatches :: [Int] -> Property
 prop_countMatches xs =
-  let n = length xs
-      script = unwords (map show xs) ++ " count"
+  let script = unwords (map show xs) ++ " count"
    in ioProperty $ do
         res <- evalScript script
-        pure (case res of
-                Right (PSInteger c : _) -> c == n
+        pure (case fmap snd res of
+                Right (PSInteger c : _) -> c == length xs
                 _                       -> False)
 
--- Stack: 'clear' empties the entire operand stack
 prop_clearEmpties :: [Int] -> Property
-prop_clearEmpties xs =
-  let script = unwords (map show xs) ++ " clear"
-   in ioProperty $ do
-        res <- evalScript script
-        pure (res == Right [])
+prop_clearEmpties xs = (unwords (map show xs) ++ " clear") `runsTo` []
 
--- Math: Commutativity of addition (x + y == y + x)
 prop_addCommutative :: Int -> Int -> Property
 prop_addCommutative x y = ioProperty $ do
-  res1 <- evalScript (show x ++ " " ++ show y ++ " add")
-  res2 <- evalScript (show y ++ " " ++ show x ++ " add")
-  pure (res1 == Right [PSInteger (x + y)] && res1 == res2)
+  r1 <- evalScript (show x ++ " " ++ show y ++ " add")
+  r2 <- evalScript (show y ++ " " ++ show x ++ " add")
+  pure (fmap snd r1 == Right [PSInteger (x + y)] && r1 == r2)
 
--- Math: Commutativity of multiplication (x * y == y * x)
 prop_mulCommutative :: Int -> Int -> Property
 prop_mulCommutative x y = ioProperty $ do
-  res1 <- evalScript (show x ++ " " ++ show y ++ " mul")
-  res2 <- evalScript (show y ++ " " ++ show x ++ " mul")
-  pure (res1 == Right [PSInteger (x * y)] && res1 == res2)
+  r1 <- evalScript (show x ++ " " ++ show y ++ " mul")
+  r2 <- evalScript (show y ++ " " ++ show x ++ " mul")
+  pure (fmap snd r1 == Right [PSInteger (x * y)] && r1 == r2)
 
--- Math: Subtraction and addition are inverses: (x - y) + y == x
 prop_subInverse :: Int -> Int -> Property
-prop_subInverse x y = ioProperty $ do
-  res <- evalScript (show x ++ " " ++ show y ++ " sub " ++ show y ++ " add")
-  pure (res == Right [PSInteger x])
+prop_subInverse x y = (show x ++ " " ++ show y ++ " sub " ++ show y ++ " add") `runsTo` [PSInteger x]
 
--- Math: Double negation is the identity
 prop_negInvolution :: Int -> Property
-prop_negInvolution x = ioProperty $ do
-  res <- evalScript (show x ++ " neg neg")
-  pure (res == Right [PSInteger x])
+prop_negInvolution x = (show x ++ " neg neg") `runsTo` [PSInteger x]
 
--- Math: Absolute value is never negative
 prop_absNonNegative :: Int -> Property
-prop_absNonNegative x = ioProperty $ do
-  res <- evalScript (show x ++ " abs")
-  pure (res == Right [PSInteger (abs x)])
+prop_absNonNegative x = (show x ++ " abs") `runsTo` [PSInteger (abs x)]
 
--- Math: Euclidean division identity: (x idiv y) * y + (x mod y) == x
 prop_idivModIdentity :: Int -> NonZero Int -> Property
-prop_idivModIdentity x (NonZero y) = ioProperty $ do
-  let script = show x ++ " " ++ show y ++ " idiv " ++ show y ++ " mul "
-            ++ show x ++ " " ++ show y ++ " mod add"
-  res <- evalScript script
-  pure (res == Right [PSInteger x])
+prop_idivModIdentity x (NonZero y) =
+  (show x ++ " " ++ show y ++ " idiv " ++ show y ++ " mul " ++ show x ++ " " ++ show y ++ " mod add")
+    `runsTo` [PSInteger x]
 
--- Control: 'ifelse' selects the first branch on true
 prop_ifelseTrue :: Int -> Int -> Property
-prop_ifelseTrue x y = ioProperty $ do
-  res <- evalScript ("true { " ++ show x ++ " } { " ++ show y ++ " } ifelse")
-  pure (res == Right [PSInteger x])
+prop_ifelseTrue x y = ("true { " ++ show x ++ " } { " ++ show y ++ " } ifelse") `runsTo` [PSInteger x]
 
--- Control: 'ifelse' selects the second branch on false
 prop_ifelseFalse :: Int -> Int -> Property
-prop_ifelseFalse x y = ioProperty $ do
-  res <- evalScript ("false { " ++ show x ++ " } { " ++ show y ++ " } ifelse")
-  pure (res == Right [PSInteger y])
+prop_ifelseFalse x y = ("false { " ++ show x ++ " } { " ++ show y ++ " } ifelse") `runsTo` [PSInteger y]
 
--- Control: 'repeat' executes exactly n iterations
 prop_repeatCount :: NonNegative (Small Int) -> Property
-prop_repeatCount (NonNegative (Small n)) = ioProperty $ do
-  res <- evalScript ("0 " ++ show n ++ " { 1 add } repeat")
-  pure (res == Right [PSInteger n])
+prop_repeatCount (NonNegative (Small n)) = ("0 " ++ show n ++ " { 1 add } repeat") `runsTo` [PSInteger n]
 
--- Scoping: 'def' followed by identifier evaluates to the bound value
 prop_defLookup :: Int -> Property
-prop_defLookup x = ioProperty $ do
-  res <- evalScript ("/x " ++ show x ++ " def x")
-  pure (res == Right [PSInteger x])
+prop_defLookup x = ("/x " ++ show x ++ " def x") `runsTo` [PSInteger x]
 
--- Relational: Equality is reflexive (x eq x == true)
 prop_eqReflexive :: Int -> Property
-prop_eqReflexive x = ioProperty $ do
-  res <- evalScript (show x ++ " " ++ show x ++ " eq")
-  pure (res == Right [PSBoolean True])
+prop_eqReflexive x = (show x ++ " " ++ show x ++ " eq") `runsTo` [PSBoolean True]
 
+prop_quitTerminates :: Int -> Int -> Property
+prop_quitTerminates x y = (show x ++ " quit " ++ show y) `runsTo` [PSInteger x]
 
+prop_formatEq :: Int -> String -> Bool
+prop_formatEq x s =
+  formatObject False (PSInteger x) == show x &&
+  formatObject False (PSString s) == s
 
-data ProgramTest = ProgramTest
-  { testTitle    :: String
-  , programPath  :: FilePath
-  , expectedStack:: [Object]
-  }
+prop_formatDebug :: String -> Bool
+prop_formatDebug s = formatObject True (PSString s) == "(" ++ s ++ ")"
 
-testPrograms :: [ProgramTest]
+-- Section 2: Integration tests verifying final operand stack
+testPrograms :: [(FilePath, [Object])]
 testPrograms =
-  [ ProgramTest
-      { testTitle     = "Fibonacci, Lucas numbers & algebraic identity"
-      , programPath   = "test/programs/fibonacci.ps"
-      , expectedStack = [PSBoolean True, PSInteger 33, PSInteger 55]
-      }
-  , ProgramTest
-      { testTitle     = "Prime sieve, primality check & summation"
-      , programPath   = "test/programs/primes.ps"
-      , expectedStack = [PSBoolean False, PSBoolean True, PSInteger 129, PSInteger 10]
-      }
-  , ProgramTest
-      { testTitle     = "Collatz 3n+1 sequence & Horner's polynomial"
-      , programPath   = "test/programs/collatz_poly.ps"
-      , expectedStack = [PSInteger 22, PSInteger 111, PSInteger 8]
-      }
-  , ProgramTest
-      { testTitle     = "Dictionary scoping, shadowing & 'known'/'load'"
-      , programPath   = "test/programs/dict_scope.ps"
-      , expectedStack = [ PSBoolean False, PSInteger 1, PSInteger 2
-                        , PSInteger 100, PSInteger 300, PSInteger 999
-                        , PSInteger 42, PSInteger 1199
-                        ]
-      }
-  , ProgramTest
-      { testTitle     = "Operand stack indexing, copying, and multi-element roll"
-      , programPath   = "test/programs/stack_ops.ps"
-      , expectedStack = [ PSInteger 5, PSInteger 340, PSInteger 40
-                        , PSInteger 30, PSInteger 10, PSInteger 20
-                        ]
-      }
-  , ProgramTest
-      { testTitle     = "Trigonometry, logarithms, rounding family & division"
-      , programPath   = "test/programs/math_advanced.ps"
-      , expectedStack = [ PSInteger (-15), PSInteger 42, PSReal 3.4, PSInteger 2, PSInteger 3
-                        , PSReal (-3.0), PSReal 3.0, PSReal 3.0, PSReal 4.0, PSReal (-4.0)
-                        , PSReal 3.0, PSReal (-3.0), PSReal 4.0, PSReal 0.0, PSReal 3.0
-                        , PSReal 256.0, PSReal 90.0, PSReal 45.0, PSBoolean True, PSBoolean True
-                        , PSReal 13.0, PSReal 5.0
-                        ]
-      }
-  , ProgramTest
-      { testTitle     = "Euclidean GCD, LCM, recursive Factorial & Combinatorics"
-      , programPath   = "test/programs/euclid_gcd.ps"
-      , expectedStack = [ PSInteger 243, PSInteger 210, PSInteger 35, PSInteger 15
-                        , PSInteger 5040, PSInteger 720, PSInteger 60, PSInteger 36
-                        , PSInteger 12, PSInteger 35, PSInteger 6
-                        ]
-      }
-  , ProgramTest
-      { testTitle     = "Nested conditionals, De Morgan laws & nested for-loops"
-      , programPath   = "test/programs/control_flow.ps"
-      , expectedStack = [ PSInteger 31, PSInteger 30, PSInteger 60
-                        , PSBoolean True, PSBoolean True, PSBoolean True
-                        , PSBoolean True, PSBoolean True
-                        , PSInteger 1, PSInteger 0, PSInteger (-1)
-                        ]
-      }
+  [ ("fibonacci.ps",    [PSBoolean True, PSInteger 33, PSInteger 55])
+  , ("primes.ps",       [PSBoolean False, PSBoolean True, PSInteger 129, PSInteger 10])
+  , ("collatz_poly.ps", [PSInteger 22, PSInteger 111, PSInteger 8])
+  , ("dict_scope.ps",   [PSBoolean False, PSInteger 1, PSInteger 2, PSInteger 100, PSInteger 300, PSInteger 999, PSInteger 42, PSInteger 1199])
+  , ("stack_ops.ps",    [PSInteger 5, PSInteger 340, PSInteger 40, PSInteger 30, PSInteger 10, PSInteger 20])
+  , ("math_advanced.ps",[PSInteger (-15), PSInteger 42, PSReal 3.4, PSInteger 2, PSInteger 3, PSReal (-3.0), PSReal 3.0, PSReal 3.0, PSReal 4.0, PSReal (-4.0), PSReal 3.0, PSReal (-3.0), PSReal 4.0, PSReal 0.0, PSReal 3.0, PSReal 256.0, PSReal 90.0, PSReal 45.0, PSBoolean True, PSBoolean True, PSReal 13.0, PSReal 5.0])
+  , ("euclid_gcd.ps",   [PSInteger 243, PSInteger 210, PSInteger 35, PSInteger 15, PSInteger 5040, PSInteger 720, PSInteger 60, PSInteger 36, PSInteger 12, PSInteger 35, PSInteger 6])
+  , ("control_flow.ps", [PSInteger 31, PSInteger 30, PSInteger 60, PSBoolean True, PSBoolean True, PSBoolean True, PSBoolean True, PSBoolean True, PSInteger 1, PSInteger 0, PSInteger (-1)])
   ]
 
--- Runs a single program test and prints its result.
-runProgramTest :: ProgramTest -> IO Bool
-runProgramTest t = do
-  putStr ("  * " ++ testTitle t ++ " ... ")
-  res <- evalFile (programPath t)
+runProgramTest :: (FilePath, [Object]) -> IO Bool
+runProgramTest (name, expected) = do
+  putStr ("  * " ++ name ++ " ... ")
+  res <- evalFile ("test/programs" </> name)
   case res of
-    Right stack
-      | stack == expectedStack t -> do
-          putStrLn "PASS"
-          pure True
-      | otherwise -> do
-          putStrLn "FAIL"
-          putStrLn $ "      Expected: " ++ show (expectedStack t)
-          putStrLn $ "      Actual:   " ++ show stack
-          pure False
-    Left err -> do
-      putStrLn "ERROR"
-      putStrLn $ "      " ++ err
-      pure False
+    Right (_, stack)
+      | stack == expected -> putStrLn "PASS" >> pure True
+      | otherwise         -> putStrLn "FAIL" >> pure False
+    Left err -> putStrLn ("ERROR: " ++ err) >> pure False
 
+-- Section 3: Differential testing against Ghostscript
+runGhostscript :: FilePath -> IO (Either String String)
+runGhostscript path = do
+  (code, out, err) <- readProcessWithExitCode "gs" ["-q", "-dNODISPLAY", path] ""
+  case code of
+    ExitSuccess   -> pure (Right out)
+    ExitFailure _ -> pure (Left ("Ghostscript execution failed: " ++ err))
+
+compareOutputs :: String -> String -> Bool
+compareOutputs actual expected =
+  let w1 = words actual
+      w2 = words expected
+   in length w1 == length w2 && and (zipWith matchToken w1 w2)
+  where
+    matchToken t1 t2 = t1 == t2 || case (readMaybe t1 :: Maybe Double, readMaybe t2 :: Maybe Double) of
+      (Just d1, Just d2) -> abs (d1 - d2) < 0.005 || abs (d1 - d2) / max 1.0 (abs d2) < 0.005
+      _                  -> False
+
+runDiffTest :: FilePath -> IO Bool
+runDiffTest path = do
+  putStr ("  * " ++ takeFileName path ++ " (vs Ghostscript) ... ")
+  mMy <- fmap (fmap fst) (evalFile path)
+  mGs <- runGhostscript path
+  case (mMy, mGs) of
+    (Right my, Right gs)
+      | compareOutputs my gs -> putStrLn "PASS" >> pure True
+      | otherwise            -> putStrLn "FAIL" >> pure False
+    (Left err, _)            -> putStrLn ("ERROR: " ++ err) >> pure False
+    (_, Left err)            -> putStrLn ("GS ERROR: " ++ err) >> pure False
+
+runQC :: Testable prop => String -> prop -> IO Bool
+runQC lbl prop = do
+  putStrLn ("  [QC] " ++ lbl)
+  res <- quickCheckResult (withNumTests 100 prop)
+  pure (isSuccess res)
 
 main :: IO ()
 main = do
   putStrLn "\n--- Section 1: Property-Based Testing (QuickCheck) ---"
-  let qcProps =
-        [ ("Stack: dup pop preserves top value", quickCheckResult (withNumTests 100 prop_dupPop))
-        , ("Stack: exch twice preserves order", quickCheckResult (withNumTests 100 prop_exchTwice))
-        , ("Stack: dup add doubles value", quickCheckResult (withNumTests 100 prop_dupAddDoubles))
-        , ("Stack: count matches pushed items", quickCheckResult (withNumTests 100 prop_countMatches))
-        , ("Stack: clear empties operand stack", quickCheckResult (withNumTests 100 prop_clearEmpties))
-        , ("Math: addition is commutative", quickCheckResult (withNumTests 100 prop_addCommutative))
-        , ("Math: multiplication is commutative", quickCheckResult (withNumTests 100 prop_mulCommutative))
-        , ("Math: subtraction and addition are inverses", quickCheckResult (withNumTests 100 prop_subInverse))
-        , ("Math: double negation is identity", quickCheckResult (withNumTests 100 prop_negInvolution))
-        , ("Math: absolute value is non-negative", quickCheckResult (withNumTests 100 prop_absNonNegative))
-        , ("Math: integer division and modulo identity", quickCheckResult (withNumTests 100 prop_idivModIdentity))
-        , ("Control: ifelse evaluates true branch", quickCheckResult (withNumTests 100 prop_ifelseTrue))
-        , ("Control: ifelse evaluates false branch", quickCheckResult (withNumTests 100 prop_ifelseFalse))
-        , ("Control: repeat executes n times", quickCheckResult (withNumTests 100 prop_repeatCount))
-        , ("Scoping: variable definition and lookup", quickCheckResult (withNumTests 100 prop_defLookup))
-        , ("Relational: equality is reflexive", quickCheckResult (withNumTests 100 prop_eqReflexive))
-        ]
-
-  qcResults <- mapM (\(lbl, action) -> putStrLn ("  [QC] " ++ lbl) >> action) qcProps
-  let allQcPassed = all isSuccess qcResults
+  qcResults <- sequence
+    [ runQC "Stack: dup pop preserves top value" prop_dupPop
+    , runQC "Stack: exch twice preserves order" prop_exchTwice
+    , runQC "Stack: dup add doubles value" prop_dupAddDoubles
+    , runQC "Stack: count matches pushed items" prop_countMatches
+    , runQC "Stack: clear empties operand stack" prop_clearEmpties
+    , runQC "Math: addition is commutative" prop_addCommutative
+    , runQC "Math: multiplication is commutative" prop_mulCommutative
+    , runQC "Math: subtraction and addition are inverses" prop_subInverse
+    , runQC "Math: double negation is identity" prop_negInvolution
+    , runQC "Math: absolute value is non-negative" prop_absNonNegative
+    , runQC "Math: integer division and modulo identity" prop_idivModIdentity
+    , runQC "Control: ifelse evaluates true branch" prop_ifelseTrue
+    , runQC "Control: ifelse evaluates false branch" prop_ifelseFalse
+    , runQC "Control: repeat executes n times" prop_repeatCount
+    , runQC "Scoping: variable definition and lookup" prop_defLookup
+    , runQC "Relational: equality is reflexive" prop_eqReflexive
+    , runQC "Session: quit stops execution immediately" prop_quitTerminates
+    , runQC "Output: = formatting matches integer show and bare strings" prop_formatEq
+    , runQC "Output: == formatting wraps strings in parentheses" prop_formatDebug
+    ]
+  let allQcPassed = and qcResults
 
   putStrLn "\n--- Section 2: PostScript Program Integration Tests ---"
   programResults <- mapM runProgramTest testPrograms
   let allProgramsPassed = and programResults
 
-  if allQcPassed && allProgramsPassed
+  putStrLn "\n--- Section 3: Ghostscript Differential Tests (test/output_tests) ---"
+  outputFiles <- listDirectory "test/output_tests"
+  let diffFiles = sort [ "test/output_tests" </> f | f <- outputFiles, ".ps" `isSuffixOf` f ]
+  diffResults <- mapM runDiffTest diffFiles
+  let allDiffPassed = and diffResults
+
+  if allQcPassed && allProgramsPassed && allDiffPassed
     then do
-      putStrLn "RESULT: All QuickCheck properties and PostScript programs PASSED!"
+      putStrLn "\nRESULT: All QuickCheck properties, Program suites, and Ghostscript Differential tests PASSED!"
       exitSuccess
     else do
-      putStrLn "RESULT: One or more tests FAILED!"
+      putStrLn "\nRESULT: One or more tests FAILED!"
       exitFailure

@@ -55,9 +55,14 @@ data PSState = PSState
     dictStack :: [Map String Object],
     gState :: GraphicsState,
     gStateStack :: [GraphicsState],
-    canvasElements :: [String]
+    canvasElements :: [String],
+    executionTerminated :: Bool,
+    printAction :: String -> IO ()
   }
-  deriving (Show)
+
+instance Show PSState where
+  show s = "PSState { operandStack = " ++ show (operandStack s)
+        ++ ", executionTerminated = " ++ show (executionTerminated s) ++ " }"
 
 -- Interpreter monad stack
 type Interpreter a = StateT PSState IO a
@@ -87,5 +92,7 @@ initPSState =
       dictStack = [Map.empty],
       gState = initGraphicsState,
       gStateStack = [],
-      canvasElements = []
+      canvasElements = [],
+      executionTerminated = False,
+      printAction = putStr
     }

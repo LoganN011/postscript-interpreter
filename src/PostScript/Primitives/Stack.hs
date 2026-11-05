@@ -7,7 +7,12 @@ psRoll,
 psCopy, 
 psClear, 
 psCount,
-psPstack) where
+psPstack,
+psPrintEq,
+psPrintDebug,
+psPrint,
+psQuit,
+formatObject) where
   
 import Control.Monad.State
 import PostScript.Environment (pop, push)
@@ -94,20 +99,54 @@ psCount = do
   n <- gets (length.operandStack)
   push(PSInteger n)
 
--- 'pstack': Prints the contents of the operand stack to stdout (top item printed first)
+-- Helper to output a string using the configured printAction
+outputStr :: String -> Interpreter ()
+outputStr str = do
+  act <- gets printAction
+  liftIO (act str)
+
+-- 'pstack': Writes the operand stack to stdout (top element first) using '==' format
 psPstack :: Interpreter ()
 psPstack = do
   stack <- gets operandStack
-  liftIO $ do
-    putStrLn "--- top of stack ---"
-    mapM_ print stack
-    putStrLn "--- bottom of stack ---"
+  mapM_ (\obj -> outputStr (formatObject True obj ++ "\n")) stack
 
--- TODO: Output & session operators:
--- '=': any = -> pop and print value with newline
--- '==': any == -> pop and debug-print syntax representation with newline
--- 'print': string print -> pop string and print without newline
--- 'quit': quit -> exit interpreter cleanly
+-- Helper to format an Object as a string.
+-- When isDebug is True (for '=='), strings are enclosed in parentheses.
+formatObject :: Bool -> Object -> String
+formatObject isDebug obj = case obj of
+  PSInteger n  -> show n
+  PSReal r     -> show r
+  PSBoolean b  -> if b then "true" else "false"
+  PSString s   -> if isDebug then "(" ++ s ++ ")" else s
+  PSName s     -> "/" ++ s
+  PSSymbol s   -> s
+  PSBlock objs -> "{" ++ unwords (map (formatObject isDebug) objs) ++ "}"
+  PSDict _     -> "-dict-"
+
+-- '=': Pop top object and print its value with a newline
+psPrintEq :: Interpreter ()
+psPrintEq = do
+  obj <- pop
+  outputStr (formatObject False obj ++ "\n")
+
+-- '==': Pop top object and debug-print syntax representation with newline
+psPrintDebug :: Interpreter ()
+psPrintDebug = do
+  obj <- pop
+  outputStr (formatObject True obj ++ "\n")
+
+-- 'print': Pop string/value and print without a trailing newline
+psPrint :: Interpreter ()
+psPrint = do
+  obj <- pop
+  case obj of
+    PSString s -> outputStr s
+    _          -> outputStr (formatObject False obj)
+
+-- 'quit': Terminates interpreter execution cleanly
+psQuit :: Interpreter ()
+psQuit = modify (\s -> s { executionTerminated = True })
 
 -- TODO: Array & container operators:
 -- 'array': int array -> allocate array of size n

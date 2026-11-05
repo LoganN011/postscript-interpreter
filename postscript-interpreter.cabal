@@ -92,7 +92,10 @@ test-suite postscript-interpreter-test
         postscript-interpreter,
         containers,
         mtl,
-        QuickCheck
+        QuickCheck,
+        process,
+        directory,
+        filepath
 
 executable postscript-interpreter
     -- Import common warning flags.
