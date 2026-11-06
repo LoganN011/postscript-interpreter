@@ -12,6 +12,7 @@ data Object
   | PSString String
   | PSName String
   | PSSymbol String
+  | PSOperator String
   | PSBlock [Object]
   | PSDict Int
   | PSArray Int
@@ -70,6 +71,7 @@ data PSState = PSState
     gStateStack :: [GraphicsState],
     canvasElements :: [String],
     executionTerminated :: Bool,
+    loopExited :: Bool,
     printAction :: String -> IO ()
   }
 
@@ -114,5 +116,6 @@ initPSState =
       gStateStack = [],
       canvasElements = [],
       executionTerminated = False,
+      loopExited = False,
       printAction = putStr
     }

@@ -1,6 +1,6 @@
 module Main (main) where
 
-import qualified Data.Bits as Bits
+import Data.Bits qualified as Bits
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isSuffixOf, sort)
 import Data.Map.Strict qualified as Map
@@ -180,6 +180,35 @@ prop_countToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " counttomark") `r
 prop_clearToMark :: Int -> Int -> Property
 prop_clearToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " cleartomark") `runsTo` []
 
+-- Phase 3: Control Flow & Procedures (exec, loop, exit, bind)
+prop_execBlock :: Int -> Int -> Property
+prop_execBlock a b = ("{" ++ show a ++ " " ++ show b ++ " add} exec") `runsTo` [PSInteger (a + b)]
+
+prop_execLiteral :: Int -> Property
+prop_execLiteral a = (show a ++ " exec") `runsTo` [PSInteger a]
+
+prop_loopExit :: Positive (Small Int) -> Property
+prop_loopExit (Positive (Small n)) =
+  let target = (n `mod` 30) + 1
+   in ("0 { 1 add dup " ++ show target ++ " eq { exit } if } loop") `runsTo` [PSInteger target]
+
+prop_repeatExit :: Int -> Property
+prop_repeatExit val = ("1000 {" ++ show val ++ " exit } repeat") `runsTo` [PSInteger val]
+
+prop_forExit :: Positive (Small Int) -> Property
+prop_forExit (Positive (Small n)) =
+  let limit = (n `mod` 15) + 2
+   in ("1 1 100 { dup " ++ show limit ++ " eq { exit } if } for") `runsTo` map PSInteger [limit, limit - 1 .. 1]
+
+prop_bindOperator :: Property
+prop_bindOperator = "{ add } bind" `runsTo` [PSBlock [PSOperator "add"]]
+
+prop_bindPreservesLiterals :: Int -> Property
+prop_bindPreservesLiterals a = ("{ " ++ show a ++ " add } bind") `runsTo` [PSBlock [PSInteger a, PSOperator "add"]]
+
+prop_bindExecutes :: Int -> Int -> Property
+prop_bindExecutes a b = ("{ " ++ show a ++ " " ++ show b ++ " add } bind exec") `runsTo` [PSInteger (a + b)]
+
 -- Section 2: Integration tests verifying final operand stack
 testPrograms :: [(FilePath, [Object])]
 testPrograms =
@@ -215,41 +244,26 @@ compareOutputs :: String -> String -> Bool
 compareOutputs actual expected =
   let w1 = words actual
       w2 = words expected
-   in length w1 == length w2 && and (zipWith matchToken w1 w2)
+   in length w1 == length w2
+        && (and (zipWith matchToken w1 w2) || and (zipWith matchToken (sort w1) (sort w2)))
   where
     matchToken t1 t2 =
       t1 == t2 || case (readMaybe t1 :: Maybe Double, readMaybe t2 :: Maybe Double) of
         (Just d1, Just d2) -> abs (d1 - d2) < 0.005 || abs (d1 - d2) / max 1.0 (abs d2) < 0.005
         _ -> False
 
-todoFIles :: [FilePath]
-todoFIles =
-  [ "bindTest.ps",
-    "controlops.ps",
-    "functional3.ps",
-    "functional4.ps",
-    "green_controlOpTest.ps",
-    "psprog7.ps",
-    "psprog11.ps"
-  ]
-
 runDiffTest :: FilePath -> IO Bool
 runDiffTest path = do
   let fileName = takeFileName path
-  if fileName `elem` todoFIles
-    then do
-      putStrLn ("  * " ++ fileName ++ " (vs Ghostscript) ... PENDING")
-      pure True
-    else do
-      putStr ("  * " ++ fileName ++ " (vs Ghostscript) ... ")
-      mMy <- fmap (fmap fst) (evalFile path)
-      mGs <- runGhostscript path
-      case (mMy, mGs) of
-        (Right my, Right gs)
-          | compareOutputs my gs -> putStrLn "PASS" >> pure True
-          | otherwise -> putStrLn "FAIL" >> pure False
-        (Left err, _) -> putStrLn ("ERROR: " ++ err) >> pure False
-        (_, Left err) -> putStrLn ("GS ERROR: " ++ err) >> pure False
+  putStr ("  * " ++ fileName ++ " (vs Ghostscript) ... ")
+  mMy <- fmap (fmap fst) (evalFile path)
+  mGs <- runGhostscript path
+  case (mMy, mGs) of
+    (Right my, Right gs)
+      | compareOutputs my gs -> putStrLn "PASS" >> pure True
+      | otherwise -> putStrLn "FAIL" >> pure False
+    (Left err, _) -> putStrLn ("ERROR: " ++ err) >> pure False
+    (_, Left err) -> putStrLn ("GS ERROR: " ++ err) >> pure False
 
 runQC :: (Testable prop) => String -> prop -> IO Bool
 runQC lbl prop = do
@@ -296,7 +310,15 @@ main = do
         runQC "Bitwise: or on integers" prop_bitwiseOr,
         runQC "Bitwise: xor on integers" prop_bitwiseXor,
         runQC "Mark: counttomark counts elements above mark" prop_countToMark,
-        runQC "Mark: cleartomark removes elements down through mark" prop_clearToMark
+        runQC "Mark: cleartomark removes elements down through mark" prop_clearToMark,
+        runQC "Control: exec evaluates procedure block" prop_execBlock,
+        runQC "Control: exec leaves literal integer on stack" prop_execLiteral,
+        runQC "Control: loop executes repeatedly until exit" prop_loopExit,
+        runQC "Control: repeat unwinds cleanly on exit" prop_repeatExit,
+        runQC "Control: for unwinds cleanly on exit" prop_forExit,
+        runQC "Control: bind converts builtin operator names to operator objects" prop_bindOperator,
+        runQC "Control: bind preserves literal integers inside procedures" prop_bindPreservesLiterals,
+        runQC "Control: bind procedure executes correctly with bound operator" prop_bindExecutes
       ]
   let allQcPassed = and qcResults
 

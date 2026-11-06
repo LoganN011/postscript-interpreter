@@ -27,12 +27,11 @@ module PostScript.Primitives.Stack
   )
 where
 
-import Control.Monad (unless)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State (gets, modify)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import PostScript.Environment (newArray, newDict, peek, pop, popTwo, push)
+import PostScript.Environment (loopWhile, newArray, newDict, peek, pop, popTwo, push, toCode)
 import PostScript.Primitives.Dictionary (toKey)
 import PostScript.Types
 
@@ -142,12 +141,14 @@ psPut = do
 
 psForall :: ([Object] -> Interpreter ()) -> Interpreter ()
 psForall eval = do
-  proc <- pop
-  let runProc = eval (case proc of PSBlock objs -> objs; o -> [o])
-      execItem = gets executionTerminated >>= \term -> unless term runProc
+  code <- toCode <$> pop
   pop >>= \case
-    PSArray aid -> gets (Map.findWithDefault [] aid . arrayHeap) >>= mapM_ (\x -> push x >> execItem)
-    PSDict did -> gets (Map.findWithDefault Map.empty did . dictHeap) >>= mapM_ (\(k, v) -> push (PSName k) >> push v >> execItem) . Map.toList
+    PSArray aid -> do
+      xs <- gets (Map.findWithDefault [] aid . arrayHeap)
+      loopWhile [push x >> eval code | x <- xs]
+    PSDict did -> do
+      kvs <- gets (Map.findWithDefault Map.empty did . dictHeap)
+      loopWhile [push (PSName k) >> push v >> eval code | (k, v) <- Map.toList kvs]
     _ -> error "forall requires array or dict"
 
 -- Delimiters and Marks: [, ], <<, >>, counttomark, cleartomark
@@ -159,7 +160,7 @@ psCountToMark = do
   st <- gets operandStack
   case break (== PSMark) st of
     (items, PSMark : _) -> push (PSInteger (length items))
-    _                   -> error "unmatched mark on counttomark"
+    _ -> error "unmatched mark on counttomark"
 
 psClearToMark :: Interpreter ()
 psClearToMark = () <$ popToMark
@@ -220,6 +221,7 @@ formatObject :: Map Int [Object] -> Bool -> Object -> String
 formatObject _ False (PSString s) = s
 formatObject _ False (PSName s) = s
 formatObject _ False (PSSymbol s) = s
+formatObject _ False (PSOperator s) = s
 formatObject _ False (PSInteger n) = show n
 formatObject _ False (PSReal r) = show r
 formatObject _ False (PSBoolean b) = if b then "true" else "false"
@@ -231,6 +233,7 @@ formatObject heap True obj = case obj of
   PSString s -> "(" ++ s ++ ")"
   PSName s -> "/" ++ s
   PSSymbol s -> s
+  PSOperator op -> "--" ++ op ++ "--"
   PSNull -> "null"
   PSMark -> "-mark-"
   PSDict _ -> "-dict-"

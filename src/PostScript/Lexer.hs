@@ -35,16 +35,17 @@ pNumber = lexeme $ do
   let signMult = case sign of
         Just '-' -> -1.0
         _ -> 1.0
-  digits <- some digitChar
-  mDec <- optional (char '.' *> some digitChar)
-  -- TODO: support scientific notation exponents (e.g. 1e5, 1.0E-5)
-  case mDec of
-    Just frac -> do
-      let str = digits ++ "." ++ frac
-      return (PSReal (signMult * read str))
+  leadingDigits <- optional (some digitChar)
+  case leadingDigits of
+    Just digits -> do
+      mDec <- optional (char '.' *> some digitChar)
+      case mDec of
+        Just frac -> return (PSReal (signMult * read (digits ++ "." ++ frac)))
+        Nothing -> return (PSInteger (round signMult * read digits))
     Nothing -> do
-      let intVal = read digits
-      return (PSInteger (round signMult * intVal))
+      _ <- char '.'
+      frac <- some digitChar
+      return (PSReal (signMult * read ("0." ++ frac)))
 
 -- Parse literal names prefixed by '/' (e.g., /x, /myProc)
 pName :: Parser Object

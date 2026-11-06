@@ -11,9 +11,12 @@ module PostScript.Environment
     newDict,
     getGState,
     modifyGState,
+    toCode,
+    loopWhile,
   )
 where
 
+import Control.Monad (unless)
 import Control.Monad.State (gets, modify)
 import Data.Foldable (asum)
 import Data.Map.Strict (Map)
@@ -90,3 +93,21 @@ getGState = gets gState
 -- Change the active GraphicsState
 modifyGState :: (GraphicsState -> GraphicsState) -> Interpreter ()
 modifyGState f = modify (\s -> s {gState = f (gState s)})
+
+-- Extract executable code objects from a block or single object
+toCode :: Object -> [Object]
+toCode (PSBlock objs) = objs
+toCode obj            = [obj]
+
+-- Execute a sequence of loop iterations, stopping early on quit or exit
+loopWhile :: [Interpreter ()] -> Interpreter ()
+loopWhile [] = return ()
+loopWhile (action : rest) = do
+  term <- gets executionTerminated
+  ex <- gets loopExited
+  unless (term || ex) $ do
+    action
+    ex' <- gets loopExited
+    if ex'
+      then modify (\s -> s {loopExited = False})
+      else loopWhile rest

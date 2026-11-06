@@ -13,13 +13,17 @@ import Control.Monad.State (execStateT, gets)
 import PostScript.Environment (lookupDict, push)
 import PostScript.Primitives.Control
   ( psAnd,
+    psBind,
     psEq,
+    psExec,
+    psExit,
     psFor,
     psGe,
     psGt,
     psIf,
     psIfelse,
     psLe,
+    psLoop,
     psLt,
     psNe,
     psNot,
@@ -88,13 +92,16 @@ evalProgram :: [Object] -> Interpreter ()
 evalProgram [] = return ()
 evalProgram (x : xs) = do
   term <- gets executionTerminated
-  unless term $ do
+  ex <- gets loopExited
+  unless (term || ex) $ do
     evalObject x
     term' <- gets executionTerminated
-    unless term' (evalProgram xs)
+    ex' <- gets loopExited
+    unless (term' || ex') (evalProgram xs)
 
 -- Evaluates a single PostScript object according to PostScript semantics
 evalObject :: Object -> Interpreter ()
+evalObject (PSOperator name) = executeBuiltin name
 evalObject (PSSymbol name) = do
   mVal <- lookupDict name
   case mVal of
@@ -177,8 +184,11 @@ executeBuiltin name = case name of
   "ifelse" -> psIfelse evalProgram
   "repeat" -> psRepeat evalProgram
   "for" -> psFor evalProgram
-  -- TODO: wire control ops: "exec", "loop", "exit", "bind"
-  -- TODO: wire container ops: "array", "length", "get", "put", "forall", "string", "cvs"
+  "exec" -> psExec evalProgram
+  "loop" -> psLoop evalProgram
+  "exit" -> psExit
+  "bind" -> psBind
+  -- TODO: wire container ops: "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
 
