@@ -1,74 +1,67 @@
-module PostScript.Primitives.Dictionary 
-(psDef,
-psDict,
-psBegin,
-psEnd,
-psKnown,
-psLoad)where
+module PostScript.Primitives.Dictionary
+  ( psDef,
+    psDict,
+    psBegin,
+    psEnd,
+    psKnown,
+    psLoad,
+    popKey,
+    toKey,
+  )
+where
 
-
-import qualified Data.Map.Strict as Map
-import PostScript.Environment (defineSymbol, lookupDict, pop, popDict, push, pushDict)
+import Control.Monad.State (gets)
+import Data.Map.Strict qualified as Map
+import PostScript.Environment (defineSymbol, lookupDict, newDict, pop, popDict, push, pushDict)
 import PostScript.Types
 
--- 'def': key value def ->
+-- Extract string representation of a key (name, symbol, or string)
+toKey :: Object -> String
+toKey (PSName k) = k
+toKey (PSSymbol k) = k
+toKey (PSString k) = k
+toKey _ = error "key must be name, symbol, or string"
+
+-- Pop key from the operand stack
+popKey :: Interpreter String
+popKey = toKey <$> pop
+
+-- 'def': key value def -> bind in active dictionary
 psDef :: Interpreter ()
-psDef = do 
-   val <- pop
-   keyObj <- pop
-   case keyObj of 
-      PSName key -> defineSymbol key val
-      PSSymbol key -> defineSymbol key val
-      _ -> error "Type error: key must be name or symbol"
+psDef = do
+  val <- pop
+  key <- popKey
+  defineSymbol key val
 
--- 'dict': int dict -> dict
+-- 'dict': int dict -> allocate empty dictionary
 psDict :: Interpreter ()
-psDict = do
-   capObj <- pop
-   case capObj of 
-      PSInteger n 
-         | n < 0 -> error "dict capacity cannot be negative"
-         | otherwise -> push (PSDict Map.empty)
-      _ -> error "Type error: argument must be an int"
+psDict =
+  pop >>= \case
+    PSInteger n | n >= 0 -> newDict Map.empty >>= push
+    _ -> error "dict capacity must be non-negative int"
 
--- Note: 'put' and 'get' also operate on PSDict (insert and lookup key)
-
--- 'begin': dict begin ->
+-- 'begin': dict begin -> push dict onto dictStack
 psBegin :: Interpreter ()
-psBegin = do
-   dictObj <- pop
-   case dictObj of 
-      PSDict d -> pushDict d
-      _ -> error "Type error: argument must be a dict"
+psBegin =
+  pop >>= \case
+    PSDict did -> pushDict did
+    _ -> error "begin requires dict"
 
--- 'end': end ->
+-- 'end': end -> pop dict off dictStack
 psEnd :: Interpreter ()
 psEnd = () <$ popDict
 
--- 'known': dict key known -> bool
+-- 'known': dict key known -> test if key exists in dict
 psKnown :: Interpreter ()
-psKnown = do 
-   keyObj <- pop
-   dictObj <- pop
-   case (dictObj, keyObj) of 
-      (PSDict d, PSName key) -> push (PSBoolean (Map.member key d))
-      (PSDict d, PSSymbol key) -> push (PSBoolean (Map.member key d))
-      _ -> error "Type error: arguments must be dict and name"
+psKnown = do
+  key <- popKey
+  pop >>= \case
+    PSDict did -> gets (Map.member key . Map.findWithDefault Map.empty did . dictHeap) >>= push . PSBoolean
+    _ -> error "known requires dict"
 
--- 'load': key load -> value
+-- 'load': key load -> search dict stack for key's value
 psLoad :: Interpreter ()
 psLoad = do
-   keyObj <- pop
-   case keyObj of 
-      PSName key -> do
-         mVal <- lookupDict key
-         case mVal of 
-            Just val -> push val
-            Nothing -> error ("symbol not found " ++ key)
-      PSSymbol key -> do
-         mVal <- lookupDict key
-         case mVal of 
-            Just val -> push val
-            Nothing -> error ("symbol not found " ++ key)
-      _ -> error "Type error: arguments must be name or symbol"
-
+  key <- popKey
+  mVal <- lookupDict key
+  maybe (error ("symbol not found: " ++ key)) push mVal

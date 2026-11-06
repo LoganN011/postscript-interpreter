@@ -1,163 +1,238 @@
-module PostScript.Primitives.Stack 
-(psPop, 
-psDup, 
-psExch, 
-psIndex, 
-psRoll, 
-psCopy, 
-psClear, 
-psCount,
-psPstack,
-psPrintEq,
-psPrintDebug,
-psPrint,
-psQuit,
-formatObject) where
-  
-import Control.Monad.State
-import PostScript.Environment (pop, push)
+module PostScript.Primitives.Stack
+  ( psPop,
+    psDup,
+    psExch,
+    psIndex,
+    psRoll,
+    psCopy,
+    psClear,
+    psCount,
+    psPstack,
+    psPrintEq,
+    psPrintDebug,
+    psPrint,
+    psQuit,
+    psArray,
+    psLength,
+    psGet,
+    psPut,
+    psForall,
+    psMark,
+    psCountToMark,
+    psClearToMark,
+    psEndArray,
+    psStartDict,
+    psEndDict,
+    formatObject,
+  )
+where
+
+import Control.Monad (unless)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State (gets, modify)
+import Data.Map.Strict (Map)
+import Data.Map.Strict qualified as Map
+import PostScript.Environment (newArray, newDict, peek, pop, popTwo, push)
+import PostScript.Primitives.Dictionary (toKey)
 import PostScript.Types
 
--- 'pop': Discards the top element from the operand stack
+-- Stack manipulation
 psPop :: Interpreter ()
 psPop = () <$ pop
 
--- 'dup': Duplicates the top element on the operand stack
 psDup :: Interpreter ()
-psDup = do
-  x <- pop
-  push x 
-  push x
+psDup = peek >>= push
 
--- 'exch': Swaps the top two elements on the operand stack
 psExch :: Interpreter ()
-psExch = do 
-  x <- pop
-  y <- pop
-  push x
-  push y
+psExch = modify $ \s -> case operandStack s of
+  (a : b : rest) -> s {operandStack = b : a : rest}
+  _ -> error "stack underflow on exch"
 
--- 'index': Retrieves the n-th element down the stack (0-indexed)
 psIndex :: Interpreter ()
-psIndex = do 
-  nObj <- pop
-  case nObj of 
-    PSInteger n 
-      | n < 0 -> error "Index cannot be negative"
-      |otherwise -> do
-        stack <- gets operandStack
-        if length stack > n
-          then push (stack !! n)
-          else error "Index outofbounds"
-    _ -> error "Type error: arguments must be ints"
-
--- 'roll': Rolls the top n elements by j positions
-psRoll :: Interpreter ()
-psRoll = do 
-  jObj <- pop
-  nObj <- pop
-  case (nObj, jObj) of
-    (PSInteger n,PSInteger j)
-      | n < 0 -> error "Cannot Roll negative count"
-      | n == 0 || n == 1 -> return ()
-      | otherwise -> (do
-          stack <- gets operandStack
-          if length stack < n
-            then error "Stack underflow"
-            else do
-              let (target, rest) = splitAt n stack
-                  shift = (j `mod` n + n) `mod` n
-                  (front, back) = splitAt shift target
-                  rolled = back ++ front
-              modify (\s -> s { operandStack = rolled ++ rest })
-      )
-    _ -> error "Type error: arguments must be ints"
-
--- 'copy': Duplicates the top n elements
-psCopy :: Interpreter ()
-psCopy = do 
-  nObj <- pop
-  case nObj of 
+psIndex =
+  pop >>= \case
     PSInteger n
-      | n < 0 -> error "Cannot copy a negative amount"
-      | otherwise -> do 
-        stack <- gets operandStack
-        if length stack < n
-            then error "Stack underflow"
-            else do
-              let topN = take n stack
-              modify (\s -> s {operandStack = topN ++ stack})
-    _ -> error "Type error: argumetns must be ints"
+      | n >= 0 ->
+          gets operandStack >>= \st ->
+            if length st > n then push (st !! n) else error "index out of bounds"
+    _ -> error "index requires non-negative int"
 
--- 'clear': Removes all elements from the operand stack
+psRoll :: Interpreter ()
+psRoll =
+  popTwo >>= \case
+    (PSInteger j, PSInteger n)
+      | n > 1 -> modify $ \s ->
+          let (topN, rest) = splitAt n (operandStack s)
+              k = (j `mod` n + n) `mod` n
+           in s {operandStack = drop k topN ++ take k topN ++ rest}
+    (PSInteger _, PSInteger _) -> return ()
+    _ -> error "roll requires ints"
+
 psClear :: Interpreter ()
 psClear = modify (\s -> s {operandStack = []})
 
--- 'count': Pushes the total number of items currently on the operand stack
 psCount :: Interpreter ()
-psCount = do
-  n <- gets (length.operandStack)
-  push(PSInteger n)
+psCount = gets (length . operandStack) >>= push . PSInteger
 
--- Helper to output a string using the configured printAction
+psQuit :: Interpreter ()
+psQuit = modify (\s -> s {executionTerminated = True})
+
+-- Polymorphic copy (stack duplication, array copying, or dict merging)
+psCopy :: Interpreter ()
+psCopy =
+  pop >>= \case
+    PSInteger n -> modify (\s -> s {operandStack = take n (operandStack s) ++ operandStack s})
+    PSArray dst ->
+      pop >>= \case
+        PSArray src -> do
+          xs <- gets (Map.findWithDefault [] src . arrayHeap)
+          modify (\s -> s {arrayHeap = Map.adjust (\d -> xs ++ drop (length xs) d) dst (arrayHeap s)})
+          push (PSArray dst)
+        _ -> error "copy type mismatch"
+    PSDict dst ->
+      pop >>= \case
+        PSDict src -> do
+          d <- gets (Map.findWithDefault Map.empty src . dictHeap)
+          modify (\s -> s {dictHeap = Map.adjust (Map.union d) dst (dictHeap s)})
+          push (PSDict dst)
+        _ -> error "copy type mismatch"
+    _ -> error "copy requires int, array, or dict"
+
+-- Container primitives
+psArray :: Interpreter ()
+psArray =
+  pop >>= \case
+    PSInteger n | n >= 0 -> newArray (replicate n PSNull) >>= push
+    _ -> error "array size must be non-negative int"
+
+psLength :: Interpreter ()
+psLength =
+  pop >>= \case
+    PSArray aid -> gets (Map.findWithDefault [] aid . arrayHeap) >>= push . PSInteger . length
+    PSDict did -> gets (Map.findWithDefault Map.empty did . dictHeap) >>= push . PSInteger . Map.size
+    PSString s -> push (PSInteger (length s))
+    _ -> error "length requires array, dict, or string"
+
+psGet :: Interpreter ()
+psGet = do
+  k <- pop
+  c <- pop
+  case (c, k) of
+    (PSArray aid, PSInteger i) -> do
+      xs <- gets (Map.findWithDefault [] aid . arrayHeap)
+      if i >= 0 && i < length xs then push (xs !! i) else error "array index out of bounds"
+    (PSDict did, _) -> do
+      d <- gets (Map.findWithDefault Map.empty did . dictHeap)
+      maybe (error ("key not found: " ++ toKey k)) push (Map.lookup (toKey k) d)
+    (PSString s, PSInteger i) ->
+      if i >= 0 && i < length s then push (PSInteger (fromEnum (s !! i))) else error "string index out of bounds"
+    _ -> error "invalid arguments to get"
+
+psPut :: Interpreter ()
+psPut = do
+  val <- pop
+  k <- pop
+  c <- pop
+  case (c, k) of
+    (PSArray aid, PSInteger i) ->
+      modify (\s -> s {arrayHeap = Map.adjust (\xs -> take i xs ++ [val] ++ drop (i + 1) xs) aid (arrayHeap s)})
+    (PSDict did, _) ->
+      modify (\s -> s {dictHeap = Map.adjust (Map.insert (toKey k) val) did (dictHeap s)})
+    _ -> error "invalid arguments to put"
+
+psForall :: ([Object] -> Interpreter ()) -> Interpreter ()
+psForall eval = do
+  proc <- pop
+  let runProc = eval (case proc of PSBlock objs -> objs; o -> [o])
+      execItem = gets executionTerminated >>= \term -> unless term runProc
+  pop >>= \case
+    PSArray aid -> gets (Map.findWithDefault [] aid . arrayHeap) >>= mapM_ (\x -> push x >> execItem)
+    PSDict did -> gets (Map.findWithDefault Map.empty did . dictHeap) >>= mapM_ (\(k, v) -> push (PSName k) >> push v >> execItem) . Map.toList
+    _ -> error "forall requires array or dict"
+
+-- Delimiters and Marks: [, ], <<, >>, counttomark, cleartomark
+psMark :: Interpreter ()
+psMark = push PSMark
+
+psCountToMark :: Interpreter ()
+psCountToMark = do
+  st <- gets operandStack
+  case break (== PSMark) st of
+    (items, PSMark : _) -> push (PSInteger (length items))
+    _                   -> error "unmatched mark on counttomark"
+
+psClearToMark :: Interpreter ()
+psClearToMark = () <$ popToMark
+
+psStartDict :: Interpreter ()
+psStartDict = psMark
+
+psEndArray :: Interpreter ()
+psEndArray = popToMark >>= newArray >>= push
+
+psEndDict :: Interpreter ()
+psEndDict = do
+  items <- popToMark
+  let pairs = [(toKey k, v) | (k, v) <- chunk2 items]
+  newDict (Map.fromList pairs) >>= push
+  where
+    chunk2 (k : v : rest) = (k, v) : chunk2 rest
+    chunk2 [] = []
+    chunk2 [_] = error "dict literal requires even number of items"
+
+popToMark :: Interpreter [Object]
+popToMark = do
+  st <- gets operandStack
+  let (items, rest) = break (== PSMark) st
+  case rest of
+    (PSMark : remaining) -> modify (\s -> s {operandStack = remaining}) >> return (reverse items)
+    _ -> error "unmatched mark"
+
+-- Output and formatting
 outputStr :: String -> Interpreter ()
-outputStr str = do
-  act <- gets printAction
-  liftIO (act str)
+outputStr str = gets printAction >>= \act -> liftIO (act str)
 
--- 'pstack': Writes the operand stack to stdout (top element first) using '==' format
 psPstack :: Interpreter ()
 psPstack = do
-  stack <- gets operandStack
-  mapM_ (\obj -> outputStr (formatObject True obj ++ "\n")) stack
+  st <- gets operandStack
+  h <- gets arrayHeap
+  mapM_ (\o -> outputStr (formatObject h True o ++ "\n")) st
 
--- Helper to format an Object as a string.
--- When isDebug is True (for '=='), strings are enclosed in parentheses.
-formatObject :: Bool -> Object -> String
-formatObject isDebug obj = case obj of
-  PSInteger n  -> show n
-  PSReal r     -> show r
-  PSBoolean b  -> if b then "true" else "false"
-  PSString s   -> if isDebug then "(" ++ s ++ ")" else s
-  PSName s     -> "/" ++ s
-  PSSymbol s   -> s
-  PSBlock objs -> "{" ++ unwords (map (formatObject isDebug) objs) ++ "}"
-  PSDict _     -> "-dict-"
-
--- '=': Pop top object and print its value with a newline
 psPrintEq :: Interpreter ()
 psPrintEq = do
-  obj <- pop
-  outputStr (formatObject False obj ++ "\n")
+  o <- pop
+  h <- gets arrayHeap
+  outputStr (formatObject h False o ++ "\n")
 
--- '==': Pop top object and debug-print syntax representation with newline
 psPrintDebug :: Interpreter ()
 psPrintDebug = do
-  obj <- pop
-  outputStr (formatObject True obj ++ "\n")
+  o <- pop
+  h <- gets arrayHeap
+  outputStr (formatObject h True o ++ "\n")
 
--- 'print': Pop string/value and print without a trailing newline
 psPrint :: Interpreter ()
-psPrint = do
-  obj <- pop
-  case obj of
+psPrint =
+  pop >>= \case
     PSString s -> outputStr s
-    _          -> outputStr (formatObject False obj)
+    o -> gets arrayHeap >>= \h -> outputStr (formatObject h False o)
 
--- 'quit': Terminates interpreter execution cleanly
-psQuit :: Interpreter ()
-psQuit = modify (\s -> s { executionTerminated = True })
-
--- TODO: Array & container operators:
--- 'array': int array -> allocate array of size n
--- 'length': array|dict|string length -> number of elements
--- 'get': array|dict|string index|key get -> element at index/key
--- 'put': array|dict|string index|key val put -> update element at index/key
--- 'forall': array|dict proc forall -> iterate elements with proc
-
--- TODO: String & typography helpers:
--- 'string': int string -> allocate string of size n
--- 'cvs': any string cvs -> convert value to string in buffer
-
-
-
+formatObject :: Map Int [Object] -> Bool -> Object -> String
+formatObject _ False (PSString s) = s
+formatObject _ False (PSName s) = s
+formatObject _ False (PSSymbol s) = s
+formatObject _ False (PSInteger n) = show n
+formatObject _ False (PSReal r) = show r
+formatObject _ False (PSBoolean b) = if b then "true" else "false"
+formatObject _ False _ = "--nostringval--"
+formatObject heap True obj = case obj of
+  PSInteger n -> show n
+  PSReal r -> show r
+  PSBoolean b -> if b then "true" else "false"
+  PSString s -> "(" ++ s ++ ")"
+  PSName s -> "/" ++ s
+  PSSymbol s -> s
+  PSNull -> "null"
+  PSMark -> "-mark-"
+  PSDict _ -> "-dict-"
+  PSBlock objs -> "{" ++ unwords (map (formatObject heap True) objs) ++ "}"
+  PSArray aid -> "[" ++ unwords (map (formatObject heap True) (Map.findWithDefault [] aid heap)) ++ "]"

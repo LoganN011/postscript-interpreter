@@ -10,8 +10,6 @@ where
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (unless)
 import Control.Monad.State (execStateT, gets)
-import Data.Map.Strict (Map)
-import Data.Map.Strict qualified as Map
 import PostScript.Environment (lookupDict, push)
 import PostScript.Primitives.Control
   ( psAnd,
@@ -59,21 +57,32 @@ import PostScript.Primitives.Math
     psTruncate,
   )
 import PostScript.Primitives.Stack
-  ( psClear,
+  ( psArray,
+    psClear,
+    psClearToMark,
     psCopy,
     psCount,
+    psCountToMark,
     psDup,
+    psEndArray,
+    psEndDict,
     psExch,
+    psForall,
+    psGet,
     psIndex,
+    psLength,
+    psMark,
     psPop,
     psPrint,
     psPrintDebug,
     psPrintEq,
     psPstack,
+    psPut,
     psQuit,
     psRoll,
+    psStartDict,
   )
-import PostScript.Types (Interpreter, Object (..), PSState (..))
+import PostScript.Types (Interpreter, Object (..), PSState (..), defaultSystemDict)
 
 evalProgram :: [Object] -> Interpreter ()
 evalProgram [] = return ()
@@ -94,15 +103,7 @@ evalObject (PSSymbol name) = do
     Nothing -> executeBuiltin name
 evalObject obj = push obj
 
--- Initial system dictionary containing predefined standard constants
-defaultSystemDict :: Map String Object
-defaultSystemDict =
-  Map.fromList
-    [ ("true", PSBoolean True),
-      ("false", PSBoolean False)
-    ]
-
---
+-- Builtin operator dispatcher
 executeBuiltin :: String -> Interpreter ()
 executeBuiltin name = case name of
   -- Stack Primitives
@@ -115,6 +116,19 @@ executeBuiltin name = case name of
   "clear" -> psClear
   "count" -> psCount
   "pstack" -> psPstack
+  -- Container & Array Primitives
+  "array" -> psArray
+  "length" -> psLength
+  "get" -> psGet
+  "put" -> psPut
+  "forall" -> psForall evalProgram
+  "[" -> psMark
+  "]" -> psEndArray
+  "<<" -> psStartDict
+  ">>" -> psEndDict
+  "mark" -> psMark
+  "counttomark" -> psCountToMark
+  "cleartomark" -> psClearToMark
   -- Output & Session Primitives
   "=" -> psPrintEq
   "==" -> psPrintDebug

@@ -68,15 +68,24 @@ pBlock = do
   _ <- symbol "}"
   return (PSBlock objs)
 
--- TODO: parse array literals `pArray = PSArray <$> (symbol "[" *> many pObject <* symbol "]")`
+-- Parse bracket and angle-bracket container operators: [, ], <<, >>
+pDelimOp :: Parser Object
+pDelimOp =
+  choice
+    [ try (symbol "<<") >> return (PSSymbol "<<"),
+      try (symbol ">>") >> return (PSSymbol ">>"),
+      symbol "[" >> return (PSSymbol "["),
+      symbol "]" >> return (PSSymbol "]")
+    ]
 
--- Parse executable symbol / operator (e.g., add, def, moveto, true, false)
+-- Parse executable symbol / operator (e.g., add, def, moveto, true, false, null)
 pSymbol :: Parser Object
 pSymbol = lexeme $ do
   ident <- some (satisfy (not . isDelimiter))
   case ident of
     "true" -> return (PSBoolean True)
     "false" -> return (PSBoolean False)
+    "null" -> return PSNull
     _ -> return (PSSymbol ident)
 
 -- Dispatcher for any PostScript object
@@ -84,6 +93,7 @@ pObject :: Parser Object
 pObject =
   choice
     [ pBlock,
+      pDelimOp,
       pName,
       pString,
       try pNumber,

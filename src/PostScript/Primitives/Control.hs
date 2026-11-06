@@ -1,6 +1,7 @@
 module PostScript.Primitives.Control where
 
 import Control.Monad (replicateM_, when)
+import Data.Bits ((.&.), (.|.), complement, xor)
 import PostScript.Environment (pop, push)
 import PostScript.Types
 
@@ -63,40 +64,44 @@ psLt = compareNumbers (<) (<) "lt"
 psLe :: Interpreter ()
 psLe = compareNumbers (<=) (<=) "le"
 
--- 'and': bool1 bool2 and -> bool
+-- 'and': bool1 bool2 and -> bool | int1 int2 and -> int
 psAnd :: Interpreter ()
 psAnd = do 
    b <- pop
    a <- pop
    case (a, b) of
       (PSBoolean x, PSBoolean y) -> push (PSBoolean (x && y))
-      _ -> error "Type error: and arguments must be bools"
+      (PSInteger x, PSInteger y) -> push (PSInteger (x .&. y))
+      _ -> error "Type error: and arguments must be bools or ints"
 
--- 'or': bool1 bool2 or -> bool
+-- 'or': bool1 bool2 or -> bool | int1 int2 or -> int
 psOr :: Interpreter ()
 psOr = do 
    b <- pop
    a <- pop
    case (a, b) of
       (PSBoolean x, PSBoolean y) -> push (PSBoolean (x || y))
-      _ -> error "Type error: or arguments must be bools"
+      (PSInteger x, PSInteger y) -> push (PSInteger (x .|. y))
+      _ -> error "Type error: or arguments must be bools or ints"
 
--- 'not': bool not -> bool
+-- 'not': bool not -> bool | int not -> int
 psNot :: Interpreter ()
 psNot = do 
    val <- pop
    case val of 
       PSBoolean b -> push (PSBoolean (not b))
-      _ -> error "Type error: not argument must be bool"
+      PSInteger n -> push (PSInteger (complement n))
+      _ -> error "Type error: not argument must be bool or int"
 
--- 'xor': bool1 bool2 xor -> bool
+-- 'xor': bool1 bool2 xor -> bool | int1 int2 xor -> int
 psXor :: Interpreter ()
 psXor = do
    b <- pop
    a <- pop
    case (a, b) of
-      (PSBoolean x, PSBoolean y) -> push (PSBoolean ((x || y) && not (x && y)))
-      _ -> error "Type error: xor arguments must be bools"
+      (PSBoolean x, PSBoolean y) -> push (PSBoolean (x /= y))
+      (PSInteger x, PSInteger y) -> push (PSInteger (x `xor` y))
+      _ -> error "Type error: xor arguments must be bools or ints"
 
 -- 'if': bool proc if ->
 psIf :: ([Object] -> Interpreter ()) -> Interpreter ()

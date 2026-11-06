@@ -13,8 +13,10 @@ data Object
   | PSName String
   | PSSymbol String
   | PSBlock [Object]
-  | PSDict (Map String Object)
-  -- TODO: Add PSArray [Object] for arrays (e.g. [1 2 3], matrices)
+  | PSDict Int
+  | PSArray Int
+  | PSNull
+  | PSMark
   deriving (Show, Eq)
 
 -- 2D Affine Transformation Matrix
@@ -49,10 +51,21 @@ data GraphicsState = GraphicsState
   }
   deriving (Show, Eq)
 
+-- Default initial system dictionary containing standard constants
+defaultSystemDict :: Map String Object
+defaultSystemDict =
+  Map.fromList
+    [ ("true", PSBoolean True),
+      ("false", PSBoolean False)
+    ]
+
 -- Top-level global interpreter execution state
 data PSState = PSState
   { operandStack :: [Object],
-    dictStack :: [Map String Object],
+    dictStack :: [Int],
+    dictHeap :: Map Int (Map String Object),
+    arrayHeap :: Map Int [Object],
+    nextId :: Int,
     gState :: GraphicsState,
     gStateStack :: [GraphicsState],
     canvasElements :: [String],
@@ -61,8 +74,12 @@ data PSState = PSState
   }
 
 instance Show PSState where
-  show s = "PSState { operandStack = " ++ show (operandStack s)
-        ++ ", executionTerminated = " ++ show (executionTerminated s) ++ " }"
+  show s =
+    "PSState { operandStack = "
+      ++ show (operandStack s)
+      ++ ", executionTerminated = "
+      ++ show (executionTerminated s)
+      ++ " }"
 
 -- Interpreter monad stack
 type Interpreter a = StateT PSState IO a
@@ -89,7 +106,10 @@ initPSState :: PSState
 initPSState =
   PSState
     { operandStack = [],
-      dictStack = [Map.empty],
+      dictStack = [0],
+      dictHeap = Map.singleton 0 defaultSystemDict,
+      arrayHeap = Map.empty,
+      nextId = 1,
       gState = initGraphicsState,
       gStateStack = [],
       canvasElements = [],
