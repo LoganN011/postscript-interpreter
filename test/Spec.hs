@@ -209,6 +209,75 @@ prop_bindPreservesLiterals a = ("{ " ++ show a ++ " add } bind") `runsTo` [PSBlo
 prop_bindExecutes :: Int -> Int -> Property
 prop_bindExecutes a b = ("{ " ++ show a ++ " " ++ show b ++ " add } bind exec") `runsTo` [PSInteger (a + b)]
 
+-- Phase 4A: 2D Coordinate System & Matrix Transformations
+prop_matrixAllocLength :: Property
+prop_matrixAllocLength = "matrix length" `runsTo` [PSInteger 6]
+
+prop_identmatrixIdentity :: Property
+prop_identmatrixIdentity = "matrix identmatrix dup 0 get exch 3 get" `runsTo` [PSReal 1.0, PSReal 1.0]
+
+prop_defaultmatrixIdentity :: Property
+prop_defaultmatrixIdentity = "matrix defaultmatrix dup 0 get exch 3 get" `runsTo` [PSReal 1.0, PSReal 1.0]
+
+prop_translateMatrix :: Small Int -> Small Int -> Property
+prop_translateMatrix (Small tx) (Small ty) =
+  (show tx ++ " " ++ show ty ++ " matrix translate dup 4 get exch 5 get")
+    `runsTo` [PSReal (fromIntegral ty), PSReal (fromIntegral tx)]
+
+prop_scaleMatrix :: Small Int -> Small Int -> Property
+prop_scaleMatrix (Small sx) (Small sy) =
+  (show sx ++ " " ++ show sy ++ " matrix scale dup 0 get exch 3 get")
+    `runsTo` [PSReal (fromIntegral sy), PSReal (fromIntegral sx)]
+
+prop_rotateMatrix :: Property
+prop_rotateMatrix = "0 matrix rotate dup 0 get exch 3 get" `runsTo` [PSReal 1.0, PSReal 1.0]
+
+prop_rotateCTM :: Property
+prop_rotateCTM = ioProperty $ do
+  res <- evalScript "90 rotate 10 0 transform"
+  pure $ case res of
+    Right (_, [PSReal y, PSReal x]) -> abs x < 1e-4 && abs (y - 10.0) < 1e-4
+    _ -> False
+
+prop_concatCTM :: Small Int -> Small Int -> Property
+prop_concatCTM (Small tx) (Small ty) =
+  (show tx ++ " " ++ show ty ++ " matrix translate concat 0 0 transform")
+    `runsTo` [PSReal (fromIntegral ty), PSReal (fromIntegral tx)]
+
+prop_concatmatrixIdentity :: Property
+prop_concatmatrixIdentity = "matrix matrix matrix concatmatrix 0 get" `runsTo` [PSReal 1.0]
+
+prop_invertMatrixIdentity :: Property
+prop_invertMatrixIdentity = "matrix matrix invertmatrix 0 get" `runsTo` [PSReal 1.0]
+
+prop_dtransformIgnoresTranslation :: Small Int -> Small Int -> Property
+prop_dtransformIgnoresTranslation (Small dx) (Small dy) =
+  (show dx ++ " " ++ show dy ++ " 100 200 translate dtransform")
+    `runsTo` [PSReal (fromIntegral dy), PSReal (fromIntegral dx)]
+
+prop_dtransformIdtransformRoundTrip :: Small Int -> Small Int -> Property
+prop_dtransformIdtransformRoundTrip (Small dx) (Small dy) = ioProperty $ do
+  let script = show dx ++ " " ++ show dy ++ " 2 3 scale dtransform idtransform"
+  res <- evalScript script
+  pure $ case res of
+    Right (_, [PSReal dy', PSReal dx']) ->
+      abs (fromIntegral dy - dy') < 1e-6 && abs (fromIntegral dx - dx') < 1e-6
+    _ -> False
+
+prop_currentmatrixSetmatrix :: Property
+prop_currentmatrixSetmatrix =
+  "10 20 translate matrix currentmatrix initmatrix setmatrix 0 0 transform"
+    `runsTo` [PSReal 20.0, PSReal 10.0]
+
+prop_transformItransformRoundTrip :: Small Int -> Small Int -> Property
+prop_transformItransformRoundTrip (Small x) (Small y) = ioProperty $ do
+  let script = show x ++ " " ++ show y ++ " 50 100 translate transform itransform"
+  res <- evalScript script
+  pure $ case res of
+    Right (_, [PSReal y', PSReal x']) ->
+      abs (fromIntegral y - y') < 1e-6 && abs (fromIntegral x - x') < 1e-6
+    _ -> False
+
 -- Section 2: Integration tests verifying final operand stack
 testPrograms :: [(FilePath, [Object])]
 testPrograms =
@@ -318,7 +387,21 @@ main = do
         runQC "Control: for unwinds cleanly on exit" prop_forExit,
         runQC "Control: bind converts builtin operator names to operator objects" prop_bindOperator,
         runQC "Control: bind preserves literal integers inside procedures" prop_bindPreservesLiterals,
-        runQC "Control: bind procedure executes correctly with bound operator" prop_bindExecutes
+        runQC "Control: bind procedure executes correctly with bound operator" prop_bindExecutes,
+        runQC "Transform: matrix allocates 6-element identity array" prop_matrixAllocLength,
+        runQC "Transform: identmatrix fills array with identity matrix" prop_identmatrixIdentity,
+        runQC "Transform: defaultmatrix fills array with default identity matrix" prop_defaultmatrixIdentity,
+        runQC "Transform: translate with matrix argument builds translation matrix" prop_translateMatrix,
+        runQC "Transform: scale with matrix argument builds scaling matrix" prop_scaleMatrix,
+        runQC "Transform: rotate with matrix argument builds rotation matrix" prop_rotateMatrix,
+        runQC "Transform: rotate CTM by 90 degrees rotates coordinate axis" prop_rotateCTM,
+        runQC "Transform: concat premultiplies matrix onto CTM" prop_concatCTM,
+        runQC "Transform: concatmatrix of two identity matrices produces identity" prop_concatmatrixIdentity,
+        runQC "Transform: invertmatrix of identity is identity" prop_invertMatrixIdentity,
+        runQC "Transform: dtransform ignores translation component of CTM" prop_dtransformIgnoresTranslation,
+        runQC "Transform: dtransform and idtransform roundtrip distance vector" prop_dtransformIdtransformRoundTrip,
+        runQC "Transform: currentmatrix, initmatrix, setmatrix restore CTM" prop_currentmatrixSetmatrix,
+        runQC "Transform: transform and itransform roundtrip cleanly" prop_transformItransformRoundTrip
       ]
   let allQcPassed = and qcResults
 

@@ -39,6 +39,24 @@ import PostScript.Primitives.Dictionary
     psKnown,
     psLoad,
   )
+import PostScript.Primitives.Graphics.Transform
+  ( psConcat,
+    psConcatmatrix,
+    psCurrentmatrix,
+    psDefaultmatrix,
+    psDtransform,
+    psIdentmatrix,
+    psIdtransform,
+    psInitmatrix,
+    psInvertmatrix,
+    psItransform,
+    psMatrix,
+    psRotate,
+    psScale,
+    psSetmatrix,
+    psTransform,
+    psTranslate,
+  )
 import PostScript.Primitives.Math
   ( psAbs,
     psAdd,
@@ -188,6 +206,23 @@ executeBuiltin name = case name of
   "loop" -> psLoop evalProgram
   "exit" -> psExit
   "bind" -> psBind
+  -- Graphics 2D Matrix & Transformation Primitives (Phase 4A)
+  "matrix" -> psMatrix
+  "initmatrix" -> psInitmatrix
+  "defaultmatrix" -> psDefaultmatrix
+  "identmatrix" -> psIdentmatrix
+  "currentmatrix" -> psCurrentmatrix
+  "setmatrix" -> psSetmatrix
+  "translate" -> psTranslate
+  "scale" -> psScale
+  "rotate" -> psRotate
+  "concat" -> psConcat
+  "concatmatrix" -> psConcatmatrix
+  "invertmatrix" -> psInvertmatrix
+  "transform" -> psTransform
+  "itransform" -> psItransform
+  "dtransform" -> psDtransform
+  "idtransform" -> psIdtransform
   -- TODO: wire container ops: "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
