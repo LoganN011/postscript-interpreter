@@ -193,4 +193,5 @@ isBuiltin s =
       "pop dup exch index roll copy clear count pstack array length get put forall [ ] << >> mark counttomark cleartomark = == print quit \
       \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log \
       \def dict begin end known load eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind \
-      \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform"
+      \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform \
+      \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall"

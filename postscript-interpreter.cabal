@@ -68,7 +68,7 @@ library
         PostScript.Primitives.Dictionary
         PostScript.Primitives.Control
         PostScript.Primitives.Graphics.Transform
-        -- PostScript.Primitives.Graphics.Path
+        PostScript.Primitives.Graphics.Path
         -- PostScript.Primitives.Graphics.State
         -- PostScript.Primitives.Graphics.Render
         -- PostScript.Primitives.Graphics.Text

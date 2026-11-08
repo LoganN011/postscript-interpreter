@@ -2,7 +2,7 @@ module Main (main) where
 
 import Data.Bits qualified as Bits
 import Data.IORef (modifyIORef', newIORef, readIORef)
-import Data.List (isSuffixOf, sort)
+import Data.List (isInfixOf, isSuffixOf, sort)
 import Data.Map.Strict qualified as Map
 import PostScript.Evaluator (runInterpreter)
 import PostScript.Lexer (parsePostScript)
@@ -42,7 +42,7 @@ runsTo code expected = ioProperty $ do
   res <- evalScript code
   pure (fmap snd res == Right expected)
 
--- QuickCheck Properties - Phase 1: Stack, Math, Control, Dict Basics
+-- QuickCheck Properties - Stack, Math, Control, Dict Basics
 prop_dupPop :: Int -> Property
 prop_dupPop x = (show x ++ " dup pop") `runsTo` [PSInteger x]
 
@@ -180,7 +180,7 @@ prop_countToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " counttomark") `r
 prop_clearToMark :: Int -> Int -> Property
 prop_clearToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " cleartomark") `runsTo` []
 
--- Phase 3: Control Flow & Procedures (exec, loop, exit, bind)
+--Control Flow & Procedures (exec, loop, exit, bind)
 prop_execBlock :: Int -> Int -> Property
 prop_execBlock a b = ("{" ++ show a ++ " " ++ show b ++ " add} exec") `runsTo` [PSInteger (a + b)]
 
@@ -209,7 +209,7 @@ prop_bindPreservesLiterals a = ("{ " ++ show a ++ " add } bind") `runsTo` [PSBlo
 prop_bindExecutes :: Int -> Int -> Property
 prop_bindExecutes a b = ("{ " ++ show a ++ " " ++ show b ++ " add } bind exec") `runsTo` [PSInteger (a + b)]
 
--- Phase 4A: 2D Coordinate System & Matrix Transformations
+-- 2D Coordinate System & Matrix Transformations
 prop_matrixAllocLength :: Property
 prop_matrixAllocLength = "matrix length" `runsTo` [PSInteger 6]
 
@@ -277,6 +277,92 @@ prop_transformItransformRoundTrip (Small x) (Small y) = ioProperty $ do
     Right (_, [PSReal y', PSReal x']) ->
       abs (fromIntegral y - y') < 1e-6 && abs (fromIntegral x - x') < 1e-6
     _ -> False
+
+--Path Construction & Geometry
+prop_movetoCurrentpoint :: Small Int -> Small Int -> Property
+prop_movetoCurrentpoint (Small x) (Small y) =
+  (show x ++ " " ++ show y ++ " moveto currentpoint")
+    `runsTo` [PSReal (fromIntegral y), PSReal (fromIntegral x)]
+
+prop_rmovetoRel :: Small Int -> Small Int -> Small Int -> Small Int -> Property
+prop_rmovetoRel (Small x) (Small y) (Small dx) (Small dy) =
+  (show x ++ " " ++ show y ++ " moveto " ++ show dx ++ " " ++ show dy ++ " rmoveto currentpoint")
+    `runsTo` [PSReal (fromIntegral (y + dy)), PSReal (fromIntegral (x + dx))]
+
+prop_linetoCurrentpoint :: Small Int -> Small Int -> Property
+prop_linetoCurrentpoint (Small x) (Small y) =
+  ("0 0 moveto " ++ show x ++ " " ++ show y ++ " lineto currentpoint")
+    `runsTo` [PSReal (fromIntegral y), PSReal (fromIntegral x)]
+
+prop_rlinetoRel :: Small Int -> Small Int -> Small Int -> Small Int -> Property
+prop_rlinetoRel (Small x) (Small y) (Small dx) (Small dy) =
+  (show x ++ " " ++ show y ++ " moveto " ++ show dx ++ " " ++ show dy ++ " rlineto currentpoint")
+    `runsTo` [PSReal (fromIntegral (y + dy)), PSReal (fromIntegral (x + dx))]
+
+prop_closepathReturnsToStart :: Small Int -> Small Int -> Property
+prop_closepathReturnsToStart (Small x) (Small y) =
+  (show x ++ " " ++ show y ++ " moveto 10 20 rlineto 30 40 rlineto closepath currentpoint")
+    `runsTo` [PSReal (fromIntegral y), PSReal (fromIntegral x)]
+
+prop_newpathClearsCurrentpoint :: Property
+prop_newpathClearsCurrentpoint = ioProperty $ do
+  res <- evalScript "10 20 moveto newpath currentpoint"
+  pure $ case res of
+    Left err -> "nocurrentpoint" `isInfixOf` err
+    Right _  -> False
+
+prop_curvetoEndpoint :: Small Int -> Small Int -> Property
+prop_curvetoEndpoint (Small x3) (Small y3) =
+  ("0 0 moveto 10 20 30 40 " ++ show x3 ++ " " ++ show y3 ++ " curveto currentpoint")
+    `runsTo` [PSReal (fromIntegral y3), PSReal (fromIntegral x3)]
+
+prop_rcurvetoEndpoint :: Small Int -> Small Int -> Property
+prop_rcurvetoEndpoint (Small dx3) (Small dy3) =
+  ("10 10 moveto 5 5 10 10 " ++ show dx3 ++ " " ++ show dy3 ++ " rcurveto currentpoint")
+    `runsTo` [PSReal (fromIntegral (10 + dy3)), PSReal (fromIntegral (10 + dx3))]
+
+prop_arcEndpoint :: Property
+prop_arcEndpoint = ioProperty $ do
+  res <- evalScript "100 100 50 0 90 arc currentpoint"
+  pure $ case res of
+    Right (_, [PSReal y, PSReal x]) -> abs (x - 100.0) < 1e-4 && abs (y - 150.0) < 1e-4
+    _ -> False
+
+prop_arcnEndpoint :: Property
+prop_arcnEndpoint = ioProperty $ do
+  res <- evalScript "100 100 50 90 0 arcn currentpoint"
+  pure $ case res of
+    Right (_, [PSReal y, PSReal x]) -> abs (x - 150.0) < 1e-4 && abs (y - 100.0) < 1e-4
+    _ -> False
+
+prop_arctoTangents :: Property
+prop_arctoTangents = ioProperty $ do
+  res <- evalScript "0 0 moveto 0 100 100 100 50 arcto"
+  pure $ case res of
+    Right (_, [PSReal yt2, PSReal xt2, PSReal yt1, PSReal xt1]) ->
+      abs xt1 < 1e-4 && abs (yt1 - 50.0) < 1e-4 &&
+      abs (xt2 - 50.0) < 1e-4 && abs (yt2 - 100.0) < 1e-4
+    _ -> False
+
+prop_pathbboxRect :: Property
+prop_pathbboxRect =
+  "newpath 10 20 moveto 50 20 lineto 50 80 lineto 10 80 lineto closepath pathbbox"
+    `runsTo` [PSReal 80.0, PSReal 50.0, PSReal 20.0, PSReal 10.0]
+
+prop_flattenpathPreservesBBox :: Property
+prop_flattenpathPreservesBBox =
+  "newpath 0 0 moveto 100 100 50 0 90 arc flattenpath pathbbox"
+    `runsTo` [PSReal 150.0, PSReal 150.0, PSReal 0.0, PSReal 0.0]
+
+prop_pathforallAccumulates :: Property
+prop_pathforallAccumulates =
+  "0 newpath 10 20 moveto 30 40 lineto closepath { add add } { add add } {} { 1 add } pathforall"
+    `runsTo` [PSReal 101.0]
+
+prop_currentpointWithCTM :: Small Int -> Small Int -> Property
+prop_currentpointWithCTM (Small tx) (Small ty) =
+  ("100 200 moveto " ++ show tx ++ " " ++ show ty ++ " translate currentpoint")
+    `runsTo` [PSReal (200.0 - fromIntegral ty), PSReal (100.0 - fromIntegral tx)]
 
 -- Section 2: Integration tests verifying final operand stack
 testPrograms :: [(FilePath, [Object])]
@@ -401,7 +487,22 @@ main = do
         runQC "Transform: dtransform ignores translation component of CTM" prop_dtransformIgnoresTranslation,
         runQC "Transform: dtransform and idtransform roundtrip distance vector" prop_dtransformIdtransformRoundTrip,
         runQC "Transform: currentmatrix, initmatrix, setmatrix restore CTM" prop_currentmatrixSetmatrix,
-        runQC "Transform: transform and itransform roundtrip cleanly" prop_transformItransformRoundTrip
+        runQC "Transform: transform and itransform roundtrip cleanly" prop_transformItransformRoundTrip,
+        runQC "Path: moveto sets currentpoint" prop_movetoCurrentpoint,
+        runQC "Path: rmoveto displaces currentpoint" prop_rmovetoRel,
+        runQC "Path: lineto connects and updates currentpoint" prop_linetoCurrentpoint,
+        runQC "Path: rlineto connects relatively and updates currentpoint" prop_rlinetoRel,
+        runQC "Path: closepath closes subpath back to moveto start" prop_closepathReturnsToStart,
+        runQC "Path: newpath clears path causing nocurrentpoint" prop_newpathClearsCurrentpoint,
+        runQC "Path: curveto adds bezier and updates currentpoint to endpoint" prop_curvetoEndpoint,
+        runQC "Path: rcurveto adds relative bezier and updates currentpoint" prop_rcurvetoEndpoint,
+        runQC "Path: arc appends counter-clockwise circular arc to endpoint" prop_arcEndpoint,
+        runQC "Path: arcn appends clockwise circular arc to endpoint" prop_arcnEndpoint,
+        runQC "Path: arcto computes tangent arc points and adds to path" prop_arctoTangents,
+        runQC "Path: pathbbox calculates user-space bounding box of path" prop_pathbboxRect,
+        runQC "Path: flattenpath preserves path bounding box" prop_flattenpathPreservesBBox,
+        runQC "Path: pathforall enumerates all path segments with procs" prop_pathforallAccumulates,
+        runQC "Path: currentpoint inverse projects through modified CTM" prop_currentpointWithCTM
       ]
   let allQcPassed = and qcResults
 

@@ -39,6 +39,23 @@ import PostScript.Primitives.Dictionary
     psKnown,
     psLoad,
   )
+import PostScript.Primitives.Graphics.Path
+  ( psArc,
+    psArcn,
+    psArcto,
+    psClosepath,
+    psCurrentpoint,
+    psCurveto,
+    psFlattenpath,
+    psLineto,
+    psMoveto,
+    psNewpath,
+    psPathbbox,
+    psPathforall,
+    psRcurveto,
+    psRlineto,
+    psRmoveto,
+  )
 import PostScript.Primitives.Graphics.Transform
   ( psConcat,
     psConcatmatrix,
@@ -206,7 +223,7 @@ executeBuiltin name = case name of
   "loop" -> psLoop evalProgram
   "exit" -> psExit
   "bind" -> psBind
-  -- Graphics 2D Matrix & Transformation Primitives (Phase 4A)
+  -- Graphics 2D Matrix & Transformation Primitives
   "matrix" -> psMatrix
   "initmatrix" -> psInitmatrix
   "defaultmatrix" -> psDefaultmatrix
@@ -223,6 +240,22 @@ executeBuiltin name = case name of
   "itransform" -> psItransform
   "dtransform" -> psDtransform
   "idtransform" -> psIdtransform
+  -- Graphics Path Construction & Geometry Primitives 
+  "newpath" -> psNewpath
+  "moveto" -> psMoveto
+  "rmoveto" -> psRmoveto
+  "lineto" -> psLineto
+  "rlineto" -> psRlineto
+  "curveto" -> psCurveto
+  "rcurveto" -> psRcurveto
+  "arc" -> psArc
+  "arcn" -> psArcn
+  "arcto" -> psArcto
+  "closepath" -> psClosepath
+  "currentpoint" -> psCurrentpoint
+  "pathbbox" -> psPathbbox
+  "flattenpath" -> psFlattenpath
+  "pathforall" -> psPathforall evalProgram
   -- TODO: wire container ops: "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
