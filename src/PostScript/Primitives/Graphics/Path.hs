@@ -14,10 +14,11 @@ module PostScript.Primitives.Graphics.Path
     psPathbbox,
     psFlattenpath,
     psPathforall,
+    psClippath,
   )
 where
 
-import Control.Monad.State (gets)
+import Control.Monad.State.Strict (gets)
 import PostScript.Environment
   ( loopWhile,
     modifyGState,
@@ -41,10 +42,11 @@ import PostScript.Types
 -- Helpers for coordinate conversion and stack manipulation
 
 popNum :: Interpreter Double
-popNum = pop >>= \case
-  PSInteger n -> return (fromIntegral n)
-  PSReal r    -> return r
-  _           -> error "typecheck: expected number"
+popNum =
+  pop >>= \case
+    PSInteger n -> return (fromIntegral n)
+    PSReal r -> return r
+    _ -> error "typecheck: expected number"
 
 popPoint :: Interpreter (Double, Double)
 popPoint = do
@@ -69,10 +71,14 @@ getUserCurrentPoint op = do
 
 -- Helper to append a path segment and update currentPoint
 addEndpoint :: (Double -> Double -> PathSegment) -> (Double, Double) -> Interpreter ()
-addEndpoint mkSeg ptD = modifyGState (\s -> s
-  { currentPath = currentPath s ++ [mkSeg (fst ptD) (snd ptD)]
-  , currentPoint = Just ptD
-  })
+addEndpoint mkSeg ptD =
+  modifyGState
+    ( \s ->
+        s
+          { currentPath = mkSeg (fst ptD) (snd ptD) : currentPath s,
+            currentPoint = Just ptD
+          }
+    )
 
 -- Path construction primitives
 
@@ -131,21 +137,26 @@ psRcurveto = do
   (dx2, dy2) <- popPoint
   (dx1, dy1) <- popPoint
   (xu, yu, m) <- getUserCurrentPoint "rcurveto"
-  let (p1d, p2d, p3d) = ( transformPoint m (xu + dx1, yu + dy1)
-                        , transformPoint m (xu + dx2, yu + dy2)
-                        , transformPoint m (xu + dx3, yu + dy3)
-                        )
+  let (p1d, p2d, p3d) =
+        ( transformPoint m (xu + dx1, yu + dy1),
+          transformPoint m (xu + dx2, yu + dy2),
+          transformPoint m (xu + dx3, yu + dy3)
+        )
   addEndpoint (\_ _ -> CurveTo (fst p1d) (snd p1d) (fst p2d) (snd p2d) (fst p3d) (snd p3d)) p3d
 
 -- 'closepath': close current subpath back to most recent moveto
 psClosepath :: Interpreter ()
 psClosepath = do
   gs <- gets gState
-  case [pt | MoveTo x y <- reverse (currentPath gs), let pt = (x, y)] of
-    (startPt : _) -> modifyGState (\s -> s
-      { currentPath = currentPath s ++ [ClosePath]
-      , currentPoint = Just startPt
-      })
+  case [pt | MoveTo x y <- currentPath gs, let pt = (x, y)] of
+    (startPt : _) ->
+      modifyGState
+        ( \s ->
+            s
+              { currentPath = ClosePath : currentPath s,
+                currentPoint = Just startPt
+              }
+        )
     [] -> return ()
 
 -- 'arc': x y r a1 a2 arc -> counter-clockwise circular arc
@@ -160,29 +171,32 @@ addArc :: Bool -> Interpreter ()
 addArc isClockwise = do
   a2 <- popNum
   a1 <- popNum
-  r  <- popNum
+  r <- popNum
   (x, y) <- popPoint
   gs <- gets gState
   let m = ctm gs
       (rad1, rad2) = (a1 * pi / 180.0, a2 * pi / 180.0)
       startD = transformPoint m (x + r * cos rad1, y + r * sin rad1)
-      endD   = transformPoint m (x + r * cos rad2, y + r * sin rad2)
+      endD = transformPoint m (x + r * cos rad2, y + r * sin rad2)
       centerD = transformPoint m (x, y)
       (a, b, c, d, _, _) = m
       rScale = sqrt (abs (a * d - b * c))
       arcSeg = (if isClockwise then ArcN else Arc) (fst centerD) (snd centerD) (r * rScale) a1 a2
       leadSeg = case currentPoint gs of
         Nothing -> [MoveTo (fst startD) (snd startD)]
-        Just _  -> [LineTo (fst startD) (snd startD)]
-  modifyGState (\s -> s
-    { currentPath = currentPath s ++ leadSeg ++ [arcSeg]
-    , currentPoint = Just endD
-    })
+        Just _ -> [LineTo (fst startD) (snd startD)]
+  modifyGState
+    ( \s ->
+        s
+          { currentPath = arcSeg : (leadSeg ++ currentPath s),
+            currentPoint = Just endD
+          }
+    )
 
 -- 'arcto': x1 y1 x2 y2 r arcto -> tangent arc, leaves tangent points on stack
 psArcto :: Interpreter ()
 psArcto = do
-  r  <- popNum
+  r <- popNum
   (x2, y2) <- popPoint
   (x1, y1) <- popPoint
   (x0, y0, m) <- getUserCurrentPoint "arcto"
@@ -207,10 +221,13 @@ psArcto = do
               t1 = (x1 + dist * u1x, y1 + dist * u1y)
               t2 = (x1 + dist * u2x, y1 + dist * u2y)
               (t1D, t2D) = (transformPoint m t1, transformPoint m t2)
-          modifyGState (\s -> s
-            { currentPath = currentPath s ++ [LineTo (fst t1D) (snd t1D), LineTo (fst t2D) (snd t2D)]
-            , currentPoint = Just t2D
-            })
+          modifyGState
+            ( \s ->
+                s
+                  { currentPath = LineTo (fst t2D) (snd t2D) : LineTo (fst t1D) (snd t1D) : currentPath s,
+                    currentPoint = Just t2D
+                  }
+            )
           pushPt t1 >> pushPt t2
 
 -- 'pathbbox': -> llx lly urx ury (push bounding box of current path)
@@ -232,15 +249,15 @@ psPathbbox = do
 
 -- 'flattenpath': converts curves and arcs in currentPath to approximating line segments
 psFlattenpath :: Interpreter ()
-psFlattenpath = modifyGState (\s -> s {currentPath = flattenSegments (currentPath s)})
+psFlattenpath = modifyGState (\s -> s {currentPath = reverse (flattenSegments (reverse (currentPath s)))})
 
 -- 'pathforall': move line curve close pathforall -> iterate path segments
 psPathforall :: ([Object] -> Interpreter ()) -> Interpreter ()
 psPathforall eval = do
   closeProc <- pop
   curveProc <- pop
-  lineProc  <- pop
-  moveProc  <- pop
+  lineProc <- pop
+  moveProc <- pop
   gs <- gets gState
   case invertMatrix (ctm gs) of
     Nothing -> error "undefinedresult: singular matrix in pathforall"
@@ -248,7 +265,7 @@ psPathforall eval = do
       let toLines (Arc cx cy r a1 a2) = map (uncurry LineTo) (sampleArcPts False 16 cx cy r a1 a2)
           toLines (ArcN cx cy r a1 a2) = map (uncurry LineTo) (sampleArcPts True 16 cx cy r a1 a2)
           toLines seg = [seg]
-          segs = concatMap toLines (currentPath gs)
+          segs = concatMap toLines (reverse (currentPath gs))
           actions = map (stepSegment mInv eval moveProc lineProc curveProc closeProc) segs
        in loopWhile actions
 
@@ -293,7 +310,7 @@ flattenSegments = go (0.0, 0.0)
 
 sampleBezierPts :: Int -> (Double, Double) -> (Double, Double) -> (Double, Double) -> (Double, Double) -> [(Double, Double)]
 sampleBezierPts n (x0, y0) (x1, y1) (x2, y2) (x3, y3) =
-  [ bezier (fromIntegral i / fromIntegral n) | i <- [1 .. n] ]
+  [bezier (fromIntegral i / fromIntegral n) | i <- [1 .. n]]
   where
     bezier t =
       let u = 1.0 - t
@@ -307,12 +324,29 @@ sampleBezierPts n (x0, y0) (x1, y1) (x2, y2) (x3, y3) =
 
 sampleArcPts :: Bool -> Int -> Double -> Double -> Double -> Double -> Double -> [(Double, Double)]
 sampleArcPts isClockwise n cx cy r a1 a2 =
-  let delta = if isClockwise
-                then let angSpan = if a1 <= a2 then a1 - a2 + 360.0 else a1 - a2
-                      in -angSpan / fromIntegral n
-                else let angSpan = if a2 <= a1 then a2 - a1 + 360.0 else a2 - a1
-                      in angSpan / fromIntegral n
+  let delta =
+        if isClockwise
+          then
+            let angSpan = if a1 <= a2 then a1 - a2 + 360.0 else a1 - a2
+             in -angSpan / fromIntegral n
+          else
+            let angSpan = if a2 <= a1 then a2 - a1 + 360.0 else a2 - a1
+             in angSpan / fromIntegral n
    in [ let ang = (a1 + fromIntegral i * delta) * pi / 180.0
          in (cx + r * cos ang, cy + r * sin ang)
       | i <- [1 .. n]
       ]
+
+-- 'clippath': -> (sets current path to default clipping boundary rectangle [0, 0, 612, 792])
+psClippath :: Interpreter ()
+psClippath = modifyGState $ \gs ->
+  gs
+    { currentPath =
+        [ ClosePath,
+          LineTo 0.0 792.0,
+          LineTo 612.0 792.0,
+          LineTo 612.0 0.0,
+          MoveTo 0.0 0.0
+        ],
+      currentPoint = Just (0.0, 792.0)
+    }

@@ -13,6 +13,9 @@ module PostScript.Primitives.Stack
     psPrint,
     psQuit,
     psArray,
+    psAload,
+    psAstore,
+    psCvx,
     psLength,
     psGet,
     psPut,
@@ -28,10 +31,10 @@ module PostScript.Primitives.Stack
 where
 
 import Control.Monad.IO.Class (liftIO)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State.Strict (gets, modify)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import PostScript.Environment (loopWhile, newArray, newDict, peek, pop, popTwo, push, toCode)
+import PostScript.Environment (isBuiltin, loopWhile, newArray, newDict, peek, pop, popTwo, push, toCode)
 import PostScript.Primitives.Dictionary (toKey)
 import PostScript.Types
 
@@ -150,6 +153,46 @@ psForall eval = do
       kvs <- gets (Map.findWithDefault Map.empty did . dictHeap)
       loopWhile [push (PSName k) >> push v >> eval code | (k, v) <- Map.toList kvs]
     _ -> error "forall requires array or dict"
+
+-- 'aload': array aload -> a0 ... an-1 array (unpacks array elements and pushes array back)
+psAload :: Interpreter ()
+psAload = do
+  arrObj <- pop
+  case arrObj of
+    PSArray aid -> do
+      xs <- gets (Map.findWithDefault [] aid . arrayHeap)
+      mapM_ push xs
+      push arrObj
+    _ -> error "typecheck: aload expected array"
+
+-- 'astore': any_0 ... any_{n-1} array astore -> array
+psAstore :: Interpreter ()
+psAstore = do
+  arrObj <- pop
+  case arrObj of
+    PSArray aid -> do
+      xs <- gets (Map.findWithDefault [] aid . arrayHeap)
+      let n = length xs
+      st <- gets operandStack
+      if length st < n
+        then error "stackunderflow in astore"
+        else do
+          let (popped, remaining) = splitAt n st
+              newContents = reverse popped
+          modify (\s -> s {arrayHeap = Map.insert aid newContents (arrayHeap s), operandStack = arrObj : remaining})
+    _ -> error "typecheck: astore expected array"
+
+-- 'cvx': any cvx -> any (converts literal array/name to executable block/symbol)
+psCvx :: Interpreter ()
+psCvx =
+  pop >>= \case
+    PSArray aid -> do
+      xs <- gets (Map.findWithDefault [] aid . arrayHeap)
+      push (PSBlock xs)
+    PSName s
+      | isBuiltin s -> push (PSOperator s)
+      | otherwise -> push (PSSymbol s)
+    other -> push other
 
 -- Delimiters and Marks: [, ], <<, >>, counttomark, cleartomark
 psMark :: Interpreter ()

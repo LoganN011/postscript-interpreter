@@ -21,7 +21,7 @@ module PostScript.Primitives.Graphics.Transform
   )
 where
 
-import Control.Monad.State (gets, modify)
+import Control.Monad.State.Strict (gets, modify)
 import Data.Map.Strict qualified as Map
 import PostScript.Environment (modifyGState, newArray, peek, pop, push)
 import PostScript.Types
@@ -36,14 +36,15 @@ import PostScript.Types
 -- Number conversion helpers
 toDouble :: Object -> Maybe Double
 toDouble (PSInteger n) = Just (fromIntegral n)
-toDouble (PSReal r)    = Just r
-toDouble _             = Nothing
+toDouble (PSReal r) = Just r
+toDouble _ = Nothing
 
 popNum :: Interpreter Double
-popNum = pop >>= \case
-  PSInteger n -> return (fromIntegral n)
-  PSReal r    -> return r
-  _           -> error "typecheck: expected number"
+popNum =
+  pop >>= \case
+    PSInteger n -> return (fromIntegral n)
+    PSReal r -> return r
+    _ -> error "typecheck: expected number"
 
 matrixToObjects :: Matrix -> [Object]
 matrixToObjects (a, b, c, d, tx, ty) =
@@ -51,10 +52,10 @@ matrixToObjects (a, b, c, d, tx, ty) =
 
 objectsToMatrix :: [Object] -> Maybe Matrix
 objectsToMatrix [o1, o2, o3, o4, o5, o6] = do
-  a  <- toDouble o1
-  b  <- toDouble o2
-  c  <- toDouble o3
-  d  <- toDouble o4
+  a <- toDouble o1
+  b <- toDouble o2
+  c <- toDouble o3
+  d <- toDouble o4
   tx <- toDouble o5
   ty <- toDouble o6
   Just (a, b, c, d, tx, ty)
@@ -68,8 +69,20 @@ popMatrix = do
       heap <- gets arrayHeap
       case Map.lookup aid heap of
         Just elems -> case objectsToMatrix elems of
-          Just m  -> return (aid, m)
+          Just m -> return (aid, m)
           Nothing -> error "typecheck: array is not a 6-element numeric matrix"
+        Nothing -> error "undefined: array not found on heap"
+    _ -> error "typecheck: expected matrix array"
+
+popDestArray :: Interpreter Int
+popDestArray =
+  pop >>= \case
+    PSArray aid -> do
+      heap <- gets arrayHeap
+      case Map.lookup aid heap of
+        Just elems
+          | length elems >= 6 -> return aid
+          | otherwise -> error "rangecheck: matrix array must have length >= 6"
         Nothing -> error "undefined: array not found on heap"
     _ -> error "typecheck: expected matrix array"
 
@@ -88,21 +101,21 @@ psInitmatrix = modifyGState (\gs -> gs {ctm = identityMatrix})
 -- 'defaultmatrix': matrix -> matrix
 psDefaultmatrix :: Interpreter ()
 psDefaultmatrix = do
-  (aid, _) <- popMatrix
+  aid <- popDestArray
   writeMatrixArray aid identityMatrix
   push (PSArray aid)
 
 -- 'identmatrix': matrix -> matrix
 psIdentmatrix :: Interpreter ()
 psIdentmatrix = do
-  (aid, _) <- popMatrix
+  aid <- popDestArray
   writeMatrixArray aid identityMatrix
   push (PSArray aid)
 
 -- 'currentmatrix': matrix -> matrix
 psCurrentmatrix :: Interpreter ()
 psCurrentmatrix = do
-  (aid, _) <- popMatrix
+  aid <- popDestArray
   m <- gets (ctm . gState)
   writeMatrixArray aid m
   push (PSArray aid)
@@ -122,9 +135,9 @@ psConcat = do
 -- 'concatmatrix': m1 m2 m3 -> m3 (m3 = m1 * m2)
 psConcatmatrix :: Interpreter ()
 psConcatmatrix = do
-  (aid3, _) <- popMatrix
-  (_, m2)   <- popMatrix
-  (_, m1)   <- popMatrix
+  aid3 <- popDestArray
+  (_, m2) <- popMatrix
+  (_, m1) <- popMatrix
   let mRes = multiplyMatrix m1 m2
   writeMatrixArray aid3 mRes
   push (PSArray aid3)
@@ -132,8 +145,8 @@ psConcatmatrix = do
 -- 'invertmatrix': m1 m2 -> m2
 psInvertmatrix :: Interpreter ()
 psInvertmatrix = do
-  (aid2, _) <- popMatrix
-  (_, m1)   <- popMatrix
+  aid2 <- popDestArray
+  (_, m1) <- popMatrix
   case invertMatrix m1 of
     Just mInv -> do
       writeMatrixArray aid2 mInv
@@ -146,7 +159,7 @@ psTranslate = do
   top <- peek
   case top of
     PSArray _ -> do
-      (aid, _) <- popMatrix
+      aid <- popDestArray
       ty <- popNum
       tx <- popNum
       let t = (1.0, 0.0, 0.0, 1.0, tx, ty)
@@ -164,7 +177,7 @@ psScale = do
   top <- peek
   case top of
     PSArray _ -> do
-      (aid, _) <- popMatrix
+      aid <- popDestArray
       sy <- popNum
       sx <- popNum
       let s = (sx, 0.0, 0.0, sy, 0.0, 0.0)
@@ -182,7 +195,7 @@ psRotate = do
   top <- peek
   case top of
     PSArray _ -> do
-      (aid, _) <- popMatrix
+      aid <- popDestArray
       deg <- popNum
       let rad = deg * pi / 180.0
           c = cos rad

@@ -5,14 +5,26 @@ module PostScript.Primitives.Dictionary
     psEnd,
     psKnown,
     psLoad,
+    psWhere,
+    psCleardictstack,
+    psUserdict,
     popKey,
     toKey,
   )
 where
 
-import Control.Monad.State (gets)
+import Control.Monad.State.Strict (gets, modify)
 import Data.Map.Strict qualified as Map
-import PostScript.Environment (defineSymbol, lookupDict, newDict, pop, popDict, push, pushDict)
+import PostScript.Environment
+  ( defineSymbol,
+    isBuiltin,
+    lookupDict,
+    newDict,
+    pop,
+    popDict,
+    push,
+    pushDict,
+  )
 import PostScript.Types
 
 -- Extract string representation of a key (name, symbol, or string)
@@ -59,9 +71,39 @@ psKnown = do
     PSDict did -> gets (Map.member key . Map.findWithDefault Map.empty did . dictHeap) >>= push . PSBoolean
     _ -> error "known requires dict"
 
--- 'load': key load -> search dict stack for key's value
+-- 'load': key load -> search dict stack for key's value (falling back to builtins)
 psLoad :: Interpreter ()
 psLoad = do
   key <- popKey
   mVal <- lookupDict key
-  maybe (error ("symbol not found: " ++ key)) push mVal
+  case mVal of
+    Just val -> push val
+    Nothing
+      | isBuiltin key -> push (PSOperator key)
+      | otherwise -> error ("symbol not found: " ++ key)
+
+-- 'where': key where -> dict true OR false (search dict stack for dict containing key)
+psWhere :: Interpreter ()
+psWhere = do
+  key <- popKey
+  dStack <- gets dictStack
+  dHeap <- gets dictHeap
+  case findDict key dStack dHeap of
+    Just did -> push (PSDict did) >> push (PSBoolean True)
+    Nothing
+      | isBuiltin key -> push (PSDict 0) >> push (PSBoolean True)
+      | otherwise -> push (PSBoolean False)
+  where
+    findDict _ [] _ = Nothing
+    findDict k (did : ds) heap =
+      case Map.lookup did heap of
+        Just d | Map.member k d -> Just did
+        _ -> findDict k ds heap
+
+-- 'cleardictstack': pops all dictionaries off dictStack except root
+psCleardictstack :: Interpreter ()
+psCleardictstack = modify (\s -> s {dictStack = case dictStack s of [] -> [0]; ds -> [last ds]})
+
+-- 'userdict': -> dict (pushes user dictionary onto operand stack)
+psUserdict :: Interpreter ()
+psUserdict = push (PSDict 0)

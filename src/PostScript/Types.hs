@@ -1,21 +1,21 @@
 module PostScript.Types where
 
-import Control.Monad.State (StateT)
+import Control.Monad.State.Strict (StateT)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 
 -- Core PostScript Data Object
 data Object
-  = PSInteger Int
-  | PSReal Double
-  | PSBoolean Bool
-  | PSString String
-  | PSName String
-  | PSSymbol String
-  | PSOperator String
-  | PSBlock [Object]
-  | PSDict Int
-  | PSArray Int
+  = PSInteger !Int
+  | PSReal !Double
+  | PSBoolean !Bool
+  | PSString !String
+  | PSName !String
+  | PSSymbol !String
+  | PSOperator !String
+  | PSBlock ![Object]
+  | PSDict !Int
+  | PSArray !Int
   | PSNull
   | PSMark
   deriving (Show, Eq)
@@ -28,27 +28,28 @@ identityMatrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
 -- Vector path segments
 data PathSegment
-  = MoveTo Double Double
-  | LineTo Double Double
-  | CurveTo Double Double Double Double Double Double
-  | Arc Double Double Double Double Double
-  | ArcN Double Double Double Double Double
+  = MoveTo !Double !Double
+  | LineTo !Double !Double
+  | CurveTo !Double !Double !Double !Double !Double !Double
+  | Arc !Double !Double !Double !Double !Double
+  | ArcN !Double !Double !Double !Double !Double
   | ClosePath
   deriving (Show, Eq)
 
 -- Drawing and visual styling state
 data GraphicsState = GraphicsState
-  { ctm :: Matrix,
-    currentPath :: [PathSegment],
-    currentPoint :: Maybe (Double, Double),
-    rgbColor :: (Double, Double, Double),
-    lineWidth :: Double,
-    lineCap :: Int,
-    lineJoin :: Int,
-    dashArray :: [Double],
-    dashOffset :: Double,
-    fontName :: String,
-    fontSize :: Double
+  { ctm :: !Matrix,
+    currentPath :: ![PathSegment],
+    currentPoint :: !(Maybe (Double, Double)),
+    rgbColor :: !(Double, Double, Double),
+    lineWidth :: !Double,
+    lineCap :: !Int,
+    lineJoin :: !Int,
+    miterLimit :: !Double,
+    dashArray :: ![Double],
+    dashOffset :: !Double,
+    fontName :: !String,
+    fontSize :: !Double
   }
   deriving (Show, Eq)
 
@@ -62,16 +63,17 @@ defaultSystemDict =
 
 -- Top-level global interpreter execution state
 data PSState = PSState
-  { operandStack :: [Object],
-    dictStack :: [Int],
-    dictHeap :: Map Int (Map String Object),
-    arrayHeap :: Map Int [Object],
-    nextId :: Int,
-    gState :: GraphicsState,
-    gStateStack :: [GraphicsState],
-    canvasElements :: [String],
-    executionTerminated :: Bool,
-    loopExited :: Bool,
+  { operandStack :: ![Object],
+    dictStack :: ![Int],
+    dictHeap :: !(Map Int (Map String Object)),
+    arrayHeap :: !(Map Int [Object]),
+    nextId :: !Int,
+    randSeed :: !Int,
+    gState :: !GraphicsState,
+    gStateStack :: ![GraphicsState],
+    canvasElements :: ![String],
+    executionTerminated :: !Bool,
+    loopExited :: !Bool,
     printAction :: String -> IO ()
   }
 
@@ -97,6 +99,7 @@ initGraphicsState =
       lineWidth = 1.0,
       lineCap = 0,
       lineJoin = 0,
+      miterLimit = 10.0,
       dashArray = [],
       dashOffset = 0.0,
       fontName = "Helvetica",
@@ -112,6 +115,7 @@ initPSState =
       dictHeap = Map.singleton 0 defaultSystemDict,
       arrayHeap = Map.empty,
       nextId = 1,
+      randSeed = 1,
       gState = initGraphicsState,
       gStateStack = [],
       canvasElements = [],

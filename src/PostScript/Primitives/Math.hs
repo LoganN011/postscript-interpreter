@@ -1,28 +1,39 @@
 module PostScript.Primitives.Math
-(psAdd, 
-psSub,
-psMul, 
-psDiv, 
-psIdiv, 
-psMod, 
-psNeg, 
-psAbs, 
-psCeiling, 
-psFloor, 
-psRound, 
-psTruncate,
-psSqrt, 
-psAtan, 
-psCos, 
-psSin,
-psExp, 
-psLn,
-psLog) where
+  ( psAdd,
+    psSub,
+    psMul,
+    psDiv,
+    psIdiv,
+    psMod,
+    psNeg,
+    psAbs,
+    psCeiling,
+    psFloor,
+    psRound,
+    psTruncate,
+    psCvi,
+    psRand,
+    psSrand,
+    psRrand,
+    psUsertime,
+    psSqrt,
+    psAtan,
+    psCos,
+    psSin,
+    psExp,
+    psLn,
+    psLog,
+  )
+where
 
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State.Strict (gets, modify)
+import Data.Bits ((.&.))
 import PostScript.Environment (pop, push)
 import PostScript.Types
+import System.CPUTime (getCPUTime)
 
---extract numeric values as Double
+-- extract numeric values as Double
 toDouble :: Object -> Maybe Double
 toDouble (PSInteger n) = Just (fromIntegral n)
 toDouble (PSReal r) = Just r
@@ -31,56 +42,55 @@ toDouble _ = Nothing
 -- 'add': num1 num2 add -> sum
 psAdd :: Interpreter ()
 psAdd = do
-   b <- pop
-   a <- pop
-   case (a,b) of 
-      (PSInteger x,PSInteger y) -> push (PSInteger (x + y))
-      _ -> case (toDouble a, toDouble b) of
-         (Just x,Just y) -> push(PSReal (x + y))
-         _ -> error "Type error: arguements must be numbers in add"
+  b <- pop
+  a <- pop
+  case (a, b) of
+    (PSInteger x, PSInteger y) -> push (PSInteger (x + y))
+    _ -> case (toDouble a, toDouble b) of
+      (Just x, Just y) -> push (PSReal (x + y))
+      _ -> error "Type error: arguements must be numbers in add"
 
 -- 'sub': num1 num2 sub -> difference (num1 - num2)
 psSub :: Interpreter ()
 psSub = do
-   b <- pop
-   a <- pop
-   case (a,b) of 
-      (PSInteger x,PSInteger y) -> push (PSInteger (x - y))
-      _ -> case (toDouble a, toDouble b) of
-         (Just x,Just y) -> push(PSReal (x - y))
-         _ -> error "Type error: arguements must be numbers in sub"
+  b <- pop
+  a <- pop
+  case (a, b) of
+    (PSInteger x, PSInteger y) -> push (PSInteger (x - y))
+    _ -> case (toDouble a, toDouble b) of
+      (Just x, Just y) -> push (PSReal (x - y))
+      _ -> error "Type error: arguements must be numbers in sub"
 
 -- 'mul': num1 num2 mul -> product
 psMul :: Interpreter ()
 psMul = do
-   b <- pop
-   a <- pop
-   case (a,b) of 
-      (PSInteger x,PSInteger y) -> push (PSInteger (x * y))
-      _ -> case (toDouble a, toDouble b) of
-         (Just x,Just y) -> push(PSReal (x * y))
-         _ -> error "Type error: arguements must be numbers in mul"
+  b <- pop
+  a <- pop
+  case (a, b) of
+    (PSInteger x, PSInteger y) -> push (PSInteger (x * y))
+    _ -> case (toDouble a, toDouble b) of
+      (Just x, Just y) -> push (PSReal (x * y))
+      _ -> error "Type error: arguements must be numbers in mul"
 
 --  'div': num1 num2 div -> quotient (always yields a real in PostScript)
-psDiv :: Interpreter () 
+psDiv :: Interpreter ()
 psDiv = do
-   b <- pop
-   a <- pop
-   case (toDouble a,toDouble b) of 
-      (Just _, Just 0.0) -> error "Division by zero"
-      (Just x, Just y) -> push (PSReal (x / y))
-      _ -> error "Type error: arguements must be numbers in div"
+  b <- pop
+  a <- pop
+  case (toDouble a, toDouble b) of
+    (Just _, Just 0.0) -> error "Division by zero"
+    (Just x, Just y) -> push (PSReal (x / y))
+    _ -> error "Type error: arguements must be numbers in div"
 
 -- 'idiv': int1 int2 idiv -> integer quotient
 psIdiv :: Interpreter ()
 psIdiv = do
-   b <- pop
-   a <- pop
-   case (a, b) of 
-      (_, PSInteger 0) -> error "Division by zero"
-      (PSInteger x, PSInteger y) -> push (PSInteger (x `quot` y))
-      _ -> error "Type error: arguements must be numbers in Idiv"
-
+  b <- pop
+  a <- pop
+  case (a, b) of
+    (_, PSInteger 0) -> error "Division by zero"
+    (PSInteger x, PSInteger y) -> push (PSInteger (x `quot` y))
+    _ -> error "Type error: arguements must be numbers in Idiv"
 
 -- 'mod': int1 int2 mod -> remainder
 psMod :: Interpreter ()
@@ -88,7 +98,7 @@ psMod = do
   b <- pop
   a <- pop
   case (a, b) of
-    (_, PSInteger 0)-> error "Undefinedresult: modulo by zero"
+    (_, PSInteger 0) -> error "Undefinedresult: modulo by zero"
     (PSInteger x, PSInteger y) -> push (PSInteger (x `rem` y))
     _ -> error "type error: arguements must be numbers in mod"
 
@@ -115,7 +125,7 @@ psCeiling :: Interpreter ()
 psCeiling = do
   val <- pop
   case toDouble val of
-    Just r  -> push (PSReal (fromIntegral (ceiling r :: Integer)))
+    Just r -> push (PSReal (fromIntegral (ceiling r :: Integer)))
     Nothing -> error "type error: arguement must be numbers in ceiling"
 
 -- 'floor': num1 floor -> greatest integer <= num1 (as real)
@@ -209,3 +219,43 @@ psLog = do
       | r <= 0.0 -> error "cannot log a negative number"
       | otherwise -> push (PSReal (logBase 10.0 r))
     Nothing -> error "Type error: arguements must be numbers in log"
+
+-- 'cvi': num | string cvi -> int (truncate toward zero or parse integer)
+psCvi :: Interpreter ()
+psCvi =
+  pop >>= \case
+    PSInteger n -> push (PSInteger n)
+    PSReal r -> push (PSInteger (truncate r))
+    PSString s -> case reads s of
+      [(n, "")] -> push (PSInteger n)
+      _ -> error "typecheck: cvi string parse error"
+    _ -> error "typecheck: cvi expected number or string"
+
+-- 'rand': -> int (pseudo-random integer in range [0, 2^31-1])
+psRand :: Interpreter ()
+psRand = do
+  s <- gets randSeed
+  let next = (s * 1103515245 + 12345) .&. 0x7FFFFFFF
+  modify (\st -> st {randSeed = next})
+  push (PSInteger next)
+
+-- 'srand': int srand -> (seed pseudo-random generator)
+psSrand :: Interpreter ()
+psSrand = do
+  seed <-
+    pop >>= \case
+      PSInteger n -> return (n .&. 0x7FFFFFFF)
+      _ -> error "typecheck: srand expected integer"
+  modify (\st -> st {randSeed = seed})
+
+-- 'rrand': -> int (current random seed)
+psRrand :: Interpreter ()
+psRrand = do
+  seed <- gets randSeed
+  push (PSInteger seed)
+
+-- 'usertime': -> int (CPU time in milliseconds)
+psUsertime :: Interpreter ()
+psUsertime = do
+  t <- liftIO getCPUTime
+  push (PSInteger (fromIntegral (t `div` 1000000000)))

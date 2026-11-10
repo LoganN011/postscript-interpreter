@@ -52,7 +52,7 @@ extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
 common warnings
-    ghc-options: -Wall
+    ghc-options: -Wall -O2
 
 
 library
@@ -69,10 +69,9 @@ library
         PostScript.Primitives.Control
         PostScript.Primitives.Graphics.Transform
         PostScript.Primitives.Graphics.Path
-        -- PostScript.Primitives.Graphics.State
-        -- PostScript.Primitives.Graphics.Render
+        PostScript.Primitives.Graphics.State
+        PostScript.Primitives.Graphics.Render
         -- PostScript.Primitives.Graphics.Text
-        -- PostScript.Primitives.Graphics.Image
     hs-source-dirs:   src
     build-depends:
         base >= 4.14 && < 5,

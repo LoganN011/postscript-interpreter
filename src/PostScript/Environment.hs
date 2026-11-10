@@ -13,11 +13,12 @@ module PostScript.Environment
     modifyGState,
     toCode,
     loopWhile,
+    isBuiltin,
   )
 where
 
 import Control.Monad (unless)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State.Strict (gets, modify)
 import Data.Foldable (asum)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
@@ -45,7 +46,7 @@ peek =
 -- Pop top two items of the operand stack: returns (top, second)
 popTwo :: Interpreter (Object, Object)
 popTwo = do
-  top    <- pop
+  top <- pop
   second <- pop
   return (top, second)
 
@@ -97,7 +98,7 @@ modifyGState f = modify (\s -> s {gState = f (gState s)})
 -- Extract executable code objects from a block or single object
 toCode :: Object -> [Object]
 toCode (PSBlock objs) = objs
-toCode obj            = [obj]
+toCode obj = [obj]
 
 -- Execute a sequence of loop iterations, stopping early on quit or exit
 loopWhile :: [Interpreter ()] -> Interpreter ()
@@ -111,3 +112,15 @@ loopWhile (action : rest) = do
     if ex'
       then modify (\s -> s {loopExited = False})
       else loopWhile rest
+
+-- Check whether a symbol name is a recognized built-in operator
+isBuiltin :: String -> Bool
+isBuiltin s =
+  s
+    `elem` words
+      "pop dup exch index roll copy clear count pstack array length get put forall aload astore [ ] << >> mark counttomark cleartomark = == print quit \
+      \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log cvi rand srand rrand bitshift usertime \
+      \def dict begin end known load where cleardictstack userdict eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind cvx \
+      \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform \
+      \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall clippath \
+      \gsave grestore grestoreall save restore setrgbcolor setgray setcmykcolor sethsbcolor currentrgbcolor currentgray currentlinewidth currentmiterlimit setlinewidth setlinecap setlinejoin setmiterlimit setdash stroke fill eofill clip showpage"

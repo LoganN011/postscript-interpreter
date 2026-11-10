@@ -4,6 +4,7 @@ import Data.Bits qualified as Bits
 import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.List (isInfixOf, isSuffixOf, sort)
 import Data.Map.Strict qualified as Map
+import PostScript (executeScript)
 import PostScript.Evaluator (runInterpreter)
 import PostScript.Lexer (parsePostScript)
 import PostScript.Primitives.Stack (formatObject)
@@ -180,7 +181,7 @@ prop_countToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " counttomark") `r
 prop_clearToMark :: Int -> Int -> Property
 prop_clearToMark a b = ("mark " ++ show a ++ " " ++ show b ++ " cleartomark") `runsTo` []
 
---Control Flow & Procedures (exec, loop, exit, bind)
+-- Control Flow & Procedures (exec, loop, exit, bind)
 prop_execBlock :: Int -> Int -> Property
 prop_execBlock a b = ("{" ++ show a ++ " " ++ show b ++ " add} exec") `runsTo` [PSInteger (a + b)]
 
@@ -278,7 +279,7 @@ prop_transformItransformRoundTrip (Small x) (Small y) = ioProperty $ do
       abs (fromIntegral y - y') < 1e-6 && abs (fromIntegral x - x') < 1e-6
     _ -> False
 
---Path Construction & Geometry
+-- Path Construction & Geometry
 prop_movetoCurrentpoint :: Small Int -> Small Int -> Property
 prop_movetoCurrentpoint (Small x) (Small y) =
   (show x ++ " " ++ show y ++ " moveto currentpoint")
@@ -309,7 +310,7 @@ prop_newpathClearsCurrentpoint = ioProperty $ do
   res <- evalScript "10 20 moveto newpath currentpoint"
   pure $ case res of
     Left err -> "nocurrentpoint" `isInfixOf` err
-    Right _  -> False
+    Right _ -> False
 
 prop_curvetoEndpoint :: Small Int -> Small Int -> Property
 prop_curvetoEndpoint (Small x3) (Small y3) =
@@ -340,8 +341,10 @@ prop_arctoTangents = ioProperty $ do
   res <- evalScript "0 0 moveto 0 100 100 100 50 arcto"
   pure $ case res of
     Right (_, [PSReal yt2, PSReal xt2, PSReal yt1, PSReal xt1]) ->
-      abs xt1 < 1e-4 && abs (yt1 - 50.0) < 1e-4 &&
-      abs (xt2 - 50.0) < 1e-4 && abs (yt2 - 100.0) < 1e-4
+      abs xt1 < 1e-4
+        && abs (yt1 - 50.0) < 1e-4
+        && abs (xt2 - 50.0) < 1e-4
+        && abs (yt2 - 100.0) < 1e-4
     _ -> False
 
 prop_pathbboxRect :: Property
@@ -363,6 +366,189 @@ prop_currentpointWithCTM :: Small Int -> Small Int -> Property
 prop_currentpointWithCTM (Small tx) (Small ty) =
   ("100 200 moveto " ++ show tx ++ " " ++ show ty ++ " translate currentpoint")
     `runsTo` [PSReal (200.0 - fromIntegral ty), PSReal (100.0 - fromIntegral tx)]
+
+-- Graphics State, Color, Painting & SVG Rendering
+prop_gsaveGrestoreRGB :: Property
+prop_gsaveGrestoreRGB =
+  "1 0 0 setrgbcolor gsave 0 1 0 setrgbcolor grestore currentrgbcolor"
+    `runsTo` [PSReal 0.0, PSReal 0.0, PSReal 1.0]
+
+prop_grestoreall :: Property
+prop_grestoreall =
+  "0.2 0.3 0.4 setrgbcolor gsave 0.5 setgray gsave 1 0 0 setrgbcolor grestoreall currentrgbcolor"
+    `runsTo` [PSReal 0.4, PSReal 0.3, PSReal 0.2]
+
+prop_setrgbcolor :: Property
+prop_setrgbcolor =
+  "0.1 0.5 0.9 setrgbcolor currentrgbcolor"
+    `runsTo` [PSReal 0.9, PSReal 0.5, PSReal 0.1]
+
+prop_setgrayCurrentgray :: Property
+prop_setgrayCurrentgray =
+  "0.65 setgray currentgray"
+    `runsTo` [PSReal 0.65]
+
+prop_setcmykcolor :: Property
+prop_setcmykcolor =
+  "0 0 0 1 setcmykcolor currentrgbcolor"
+    `runsTo` [PSReal 0.0, PSReal 0.0, PSReal 0.0]
+
+prop_sethsbcolor :: Property
+prop_sethsbcolor =
+  "0 0 1 sethsbcolor currentrgbcolor"
+    `runsTo` [PSReal 1.0, PSReal 1.0, PSReal 1.0]
+
+prop_setlinewidth :: Small Int -> Property
+prop_setlinewidth (Small w) =
+  let w' = abs w + 1
+   in (show w' ++ " setlinewidth currentlinewidth") `runsTo` [PSReal (fromIntegral w')]
+
+prop_strokeClearsPath :: Property
+prop_strokeClearsPath = ioProperty $ do
+  res <- evalScript "newpath 0 0 moveto 10 10 lineto stroke currentpoint"
+  pure $ case res of
+    Left err -> "nocurrentpoint" `isInfixOf` err
+    Right _ -> False
+
+prop_fillClearsPath :: Property
+prop_fillClearsPath = ioProperty $ do
+  res <- evalScript "newpath 0 0 moveto 10 10 lineto 0 10 lineto closepath fill currentpoint"
+  pure $ case res of
+    Left err -> "nocurrentpoint" `isInfixOf` err
+    Right _ -> False
+
+prop_eofillClearsPath :: Property
+prop_eofillClearsPath = ioProperty $ do
+  res <- evalScript "newpath 0 0 moveto 10 10 lineto 0 10 lineto closepath eofill currentpoint"
+  pure $ case res of
+    Left err -> "nocurrentpoint" `isInfixOf` err
+    Right _ -> False
+
+prop_clipPreservesCurrentpoint :: Property
+prop_clipPreservesCurrentpoint =
+  "newpath 0 0 moveto 10 20 lineto clip currentpoint"
+    `runsTo` [PSReal 20.0, PSReal 10.0]
+
+prop_showpageClearsPath :: Property
+prop_showpageClearsPath = ioProperty $ do
+  res <- evalScript "newpath 0 0 moveto 10 10 lineto showpage currentpoint"
+  pure $ case res of
+    Left err -> "nocurrentpoint" `isInfixOf` err
+    Right _ -> False
+
+prop_strokeEmitsSVG :: Property
+prop_strokeEmitsSVG = ioProperty $ do
+  res <- executeScript "1 0 0 setrgbcolor 2 setlinewidth newpath 0 0 moveto 100 200 lineto stroke"
+  pure $ case res of
+    Right st ->
+      case canvasElements st of
+        [elemStr] -> "stroke=\"rgb(255,0,0)\"" `isInfixOf` elemStr && "stroke-width=\"2\"" `isInfixOf` elemStr
+        _ -> False
+    Left _ -> False
+
+prop_fillEmitsSVG :: Property
+prop_fillEmitsSVG = ioProperty $ do
+  res <- executeScript "0 1 0 setrgbcolor newpath 0 0 moveto 100 0 lineto 100 100 lineto closepath fill"
+  pure $ case res of
+    Right st ->
+      case canvasElements st of
+        [elemStr] -> "fill=\"rgb(0,255,0)\"" `isInfixOf` elemStr && "fill-rule" `notElem` words elemStr
+        _ -> False
+    Left _ -> False
+
+prop_eofillEmitsSVG :: Property
+prop_eofillEmitsSVG = ioProperty $ do
+  res <- executeScript "newpath 0 0 moveto 100 0 lineto 100 100 lineto closepath eofill"
+  pure $ case res of
+    Right st ->
+      case canvasElements st of
+        [elemStr] -> "fill-rule=\"evenodd\"" `isInfixOf` elemStr
+        _ -> False
+    Left _ -> False
+
+-- New Utility Operator Properties
+prop_cviTruncatesReal :: Property
+prop_cviTruncatesReal =
+  "3.7 cvi -2.9 cvi (42) cvi"
+    `runsTo` [PSInteger 42, PSInteger (-2), PSInteger 3]
+
+prop_randGeneratesPositiveInt :: Property
+prop_randGeneratesPositiveInt = ioProperty $ do
+  res <- evalScript "rand rand"
+  pure $ case res of
+    Right (_, [PSInteger r2, PSInteger r1]) -> r1 >= 0 && r2 >= 0
+    _ -> False
+
+prop_aloadUnpacksArray :: Property
+prop_aloadUnpacksArray = ioProperty $ do
+  res <- evalScript "[10 20 30] aload"
+  pure $ case res of
+    Right (_, [PSArray _, PSInteger 30, PSInteger 20, PSInteger 10]) -> True
+    _ -> False
+
+prop_cvxExecutesBlock :: Property
+prop_cvxExecutesBlock =
+  "[10 20 add] cvx exec" `runsTo` [PSInteger 30]
+
+prop_loadAliasesBuiltin :: Property
+prop_loadAliasesBuiltin =
+  "/m /moveto load def newpath 15 25 m currentpoint"
+    `runsTo` [PSReal 25.0, PSReal 15.0]
+
+prop_whereFindsDict :: Property
+prop_whereFindsDict = ioProperty $ do
+  res <- evalScript "/myVar 99 def /myVar where /nonexistent where"
+  pure $ case res of
+    Right (_, [PSBoolean False, PSBoolean True, PSDict _]) -> True
+    _ -> False
+
+prop_saveRestorePreservesState :: Property
+prop_saveRestorePreservesState =
+  "10 setlinewidth save 50 setlinewidth restore currentlinewidth"
+    `runsTo` [PSReal 10.0]
+
+prop_clippathEmitsBoundary :: Property
+prop_clippathEmitsBoundary =
+  "clippath pathbbox"
+    `runsTo` [PSReal 792.0, PSReal 612.0, PSReal 0.0, PSReal 0.0]
+
+prop_bitshiftShiftsBits :: Property
+prop_bitshiftShiftsBits =
+  "8 2 bitshift 32 -2 bitshift"
+    `runsTo` [PSInteger 8, PSInteger 32]
+
+prop_astorePopsIntoArray :: Property
+prop_astorePopsIntoArray = ioProperty $ do
+  res <- evalScript "10 20 30 3 array astore aload"
+  pure $ case res of
+    Right (_, [PSArray _, PSInteger 30, PSInteger 20, PSInteger 10]) -> True
+    _ -> False
+
+prop_cleardictstackResetsStack :: Property
+prop_cleardictstackResetsStack = ioProperty $ do
+  res <- evalScript "5 dict begin 5 dict begin cleardictstack userdict"
+  pure $ case res of
+    Right (_, [PSDict 0]) -> True
+    _ -> False
+
+prop_usertimeReturnsInt :: Property
+prop_usertimeReturnsInt = ioProperty $ do
+  res <- evalScript "usertime"
+  pure $ case res of
+    Right (_, [PSInteger t]) -> t >= 0
+    _ -> False
+
+prop_userdictPushesRootDict :: Property
+prop_userdictPushesRootDict = ioProperty $ do
+  res <- evalScript "userdict"
+  pure $ case res of
+    Right (_, [PSDict 0]) -> True
+    _ -> False
+
+prop_trailingDotParsesReal :: Property
+prop_trailingDotParsesReal =
+  "72. 300. div"
+    `runsTo` [PSReal 0.24]
 
 -- Section 2: Integration tests verifying final operand stack
 testPrograms :: [(FilePath, [Object])]
@@ -502,7 +688,36 @@ main = do
         runQC "Path: pathbbox calculates user-space bounding box of path" prop_pathbboxRect,
         runQC "Path: flattenpath preserves path bounding box" prop_flattenpathPreservesBBox,
         runQC "Path: pathforall enumerates all path segments with procs" prop_pathforallAccumulates,
-        runQC "Path: currentpoint inverse projects through modified CTM" prop_currentpointWithCTM
+        runQC "Path: currentpoint inverse projects through modified CTM" prop_currentpointWithCTM,
+        runQC "State: gsave and grestore preserve and restore color" prop_gsaveGrestoreRGB,
+        runQC "State: grestoreall restores initial graphics state" prop_grestoreall,
+        runQC "State: setrgbcolor and currentrgbcolor roundtrip" prop_setrgbcolor,
+        runQC "State: setgray and currentgray calculate luminance" prop_setgrayCurrentgray,
+        runQC "State: setcmykcolor converts CMYK to RGB" prop_setcmykcolor,
+        runQC "State: sethsbcolor converts HSB to RGB" prop_sethsbcolor,
+        runQC "State: setlinewidth and currentlinewidth roundtrip" prop_setlinewidth,
+        runQC "State: stroke clears active path" prop_strokeClearsPath,
+        runQC "State: fill clears active path" prop_fillClearsPath,
+        runQC "State: eofill clears active path" prop_eofillClearsPath,
+        runQC "State: clip preserves active path and currentpoint" prop_clipPreservesCurrentpoint,
+        runQC "State: showpage clears active path" prop_showpageClearsPath,
+        runQC "State: stroke emits valid SVG stroke element" prop_strokeEmitsSVG,
+        runQC "State: fill emits valid SVG fill element" prop_fillEmitsSVG,
+        runQC "State: eofill emits valid SVG evenodd fill element" prop_eofillEmitsSVG,
+        runQC "Util: cvi truncates real numbers and parses string integers" prop_cviTruncatesReal,
+        runQC "Util: rand generates non-negative pseudo-random integers" prop_randGeneratesPositiveInt,
+        runQC "Util: aload unpacks array elements onto stack" prop_aloadUnpacksArray,
+        runQC "Util: cvx converts literal array into executable block" prop_cvxExecutesBlock,
+        runQC "Util: load successfully resolves and aliases built-in operators" prop_loadAliasesBuiltin,
+        runQC "Util: where searches dictionary stack correctly" prop_whereFindsDict,
+        runQC "Util: save and restore preserve graphics state" prop_saveRestorePreservesState,
+        runQC "Util: clippath sets path to page boundary rectangle" prop_clippathEmitsBoundary,
+        runQC "Util: bitshift shifts integer bits left and right" prop_bitshiftShiftsBits,
+        runQC "Util: astore stores stack values into array" prop_astorePopsIntoArray,
+        runQC "Util: cleardictstack resets dictionary stack to root" prop_cleardictstackResetsStack,
+        runQC "Util: usertime returns non-negative execution time" prop_usertimeReturnsInt,
+        runQC "Util: userdict pushes base dictionary" prop_userdictPushesRootDict,
+        runQC "Util: trailing dot numbers parse as reals" prop_trailingDotParsesReal
       ]
   let allQcPassed = and qcResults
 

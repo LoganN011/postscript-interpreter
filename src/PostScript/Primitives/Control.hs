@@ -1,8 +1,9 @@
 module PostScript.Primitives.Control where
 
-import Control.Monad.State (modify)
-import Data.Bits (complement, xor, (.&.), (.|.))
-import PostScript.Environment (lookupDict, loopWhile, pop, push, toCode)
+import Control.Monad.State.Strict (modify)
+import Data.Bits (complement, shift, xor, (.&.), (.|.))
+import Data.Word (Word32)
+import PostScript.Environment (isBuiltin, lookupDict, loopWhile, pop, push, toCode)
 import PostScript.Types
 
 -- extract numeric values as Double
@@ -101,6 +102,18 @@ psXor = do
     (PSInteger x, PSInteger y) -> push (PSInteger (x `xor` y))
     _ -> error "Type error: xor arguments must be bools or ints"
 
+-- 'bitshift': int shift bitshift -> int'
+psBitshift :: Interpreter ()
+psBitshift = do
+  s <- pop
+  n <- pop
+  case (n, s) of
+    (PSInteger x, PSInteger shiftAmt) ->
+      let w = fromIntegral x :: Word32
+          res = shift w shiftAmt
+       in push (PSInteger (fromIntegral res))
+    _ -> error "Type error: bitshift arguments must be integers"
+
 -- 'if': bool proc if ->
 psIf :: ([Object] -> Interpreter ()) -> Interpreter ()
 psIf evalProg = do
@@ -185,13 +198,3 @@ bindObj (PSSymbol name) = do
       | isBuiltin name -> pure (PSOperator name)
       | otherwise -> pure (PSSymbol name)
 bindObj other = pure other
-
-isBuiltin :: String -> Bool
-isBuiltin s =
-  s
-    `elem` words
-      "pop dup exch index roll copy clear count pstack array length get put forall [ ] << >> mark counttomark cleartomark = == print quit \
-      \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log \
-      \def dict begin end known load eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind \
-      \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform \
-      \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall"

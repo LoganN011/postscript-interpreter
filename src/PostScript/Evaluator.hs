@@ -9,11 +9,12 @@ where
 
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (unless)
-import Control.Monad.State (execStateT, gets)
+import Control.Monad.State.Strict (execStateT, gets)
 import PostScript.Environment (lookupDict, push)
 import PostScript.Primitives.Control
   ( psAnd,
     psBind,
+    psBitshift,
     psEq,
     psExec,
     psExit,
@@ -33,16 +34,20 @@ import PostScript.Primitives.Control
   )
 import PostScript.Primitives.Dictionary
   ( psBegin,
+    psCleardictstack,
     psDef,
     psDict,
     psEnd,
     psKnown,
     psLoad,
+    psUserdict,
+    psWhere,
   )
 import PostScript.Primitives.Graphics.Path
   ( psArc,
     psArcn,
     psArcto,
+    psClippath,
     psClosepath,
     psCurrentpoint,
     psCurveto,
@@ -55,6 +60,31 @@ import PostScript.Primitives.Graphics.Path
     psRcurveto,
     psRlineto,
     psRmoveto,
+  )
+import PostScript.Primitives.Graphics.State
+  ( psClip,
+    psCurrentgray,
+    psCurrentlinewidth,
+    psCurrentmiterlimit,
+    psCurrentrgbcolor,
+    psEofill,
+    psFill,
+    psGrestore,
+    psGrestoreall,
+    psGsave,
+    psRestore,
+    psSave,
+    psSetcmykcolor,
+    psSetdash,
+    psSetgray,
+    psSethsbcolor,
+    psSetlinecap,
+    psSetlinejoin,
+    psSetlinewidth,
+    psSetmiterlimit,
+    psSetrgbcolor,
+    psShowpage,
+    psStroke,
   )
 import PostScript.Primitives.Graphics.Transform
   ( psConcat,
@@ -80,6 +110,7 @@ import PostScript.Primitives.Math
     psAtan,
     psCeiling,
     psCos,
+    psCvi,
     psDiv,
     psExp,
     psFloor,
@@ -89,19 +120,26 @@ import PostScript.Primitives.Math
     psMod,
     psMul,
     psNeg,
+    psRand,
     psRound,
+    psRrand,
     psSin,
     psSqrt,
+    psSrand,
     psSub,
     psTruncate,
+    psUsertime,
   )
 import PostScript.Primitives.Stack
-  ( psArray,
+  ( psAload,
+    psArray,
+    psAstore,
     psClear,
     psClearToMark,
     psCopy,
     psCount,
     psCountToMark,
+    psCvx,
     psDup,
     psEndArray,
     psEndDict,
@@ -141,6 +179,8 @@ evalObject (PSSymbol name) = do
   mVal <- lookupDict name
   case mVal of
     Just (PSBlock code) -> evalProgram code
+    Just (PSOperator op) -> executeBuiltin op
+    Just (PSSymbol sym) -> evalObject (PSSymbol sym)
     Just val -> push val
     Nothing -> executeBuiltin name
 evalObject obj = push obj
@@ -164,6 +204,9 @@ executeBuiltin name = case name of
   "get" -> psGet
   "put" -> psPut
   "forall" -> psForall evalProgram
+  "aload" -> psAload
+  "astore" -> psAstore
+  "cvx" -> psCvx
   "[" -> psMark
   "]" -> psEndArray
   "<<" -> psStartDict
@@ -189,6 +232,12 @@ executeBuiltin name = case name of
   "floor" -> psFloor
   "round" -> psRound
   "truncate" -> psTruncate
+  "cvi" -> psCvi
+  "rand" -> psRand
+  "srand" -> psSrand
+  "rrand" -> psRrand
+  "bitshift" -> psBitshift
+  "usertime" -> psUsertime
   "sqrt" -> psSqrt
   "atan" -> psAtan
   "cos" -> psCos
@@ -203,6 +252,9 @@ executeBuiltin name = case name of
   "end" -> psEnd
   "known" -> psKnown
   "load" -> psLoad
+  "where" -> psWhere
+  "cleardictstack" -> psCleardictstack
+  "userdict" -> psUserdict
   -- Relational & Boolean Primitives
   "eq" -> psEq
   "ne" -> psNe
@@ -240,7 +292,7 @@ executeBuiltin name = case name of
   "itransform" -> psItransform
   "dtransform" -> psDtransform
   "idtransform" -> psIdtransform
-  -- Graphics Path Construction & Geometry Primitives 
+  -- Graphics Path Construction & Geometry Primitives
   "newpath" -> psNewpath
   "moveto" -> psMoveto
   "rmoveto" -> psRmoveto
@@ -256,6 +308,31 @@ executeBuiltin name = case name of
   "pathbbox" -> psPathbbox
   "flattenpath" -> psFlattenpath
   "pathforall" -> psPathforall evalProgram
+  "clippath" -> psClippath
+  -- Graphics State, Color & Painting Primitives
+  "gsave" -> psGsave
+  "grestore" -> psGrestore
+  "grestoreall" -> psGrestoreall
+  "save" -> psSave
+  "restore" -> psRestore
+  "setrgbcolor" -> psSetrgbcolor
+  "setgray" -> psSetgray
+  "setcmykcolor" -> psSetcmykcolor
+  "sethsbcolor" -> psSethsbcolor
+  "currentrgbcolor" -> psCurrentrgbcolor
+  "currentgray" -> psCurrentgray
+  "currentlinewidth" -> psCurrentlinewidth
+  "setlinewidth" -> psSetlinewidth
+  "setlinecap" -> psSetlinecap
+  "setlinejoin" -> psSetlinejoin
+  "setmiterlimit" -> psSetmiterlimit
+  "currentmiterlimit" -> psCurrentmiterlimit
+  "setdash" -> psSetdash
+  "stroke" -> psStroke
+  "fill" -> psFill
+  "eofill" -> psEofill
+  "clip" -> psClip
+  "showpage" -> psShowpage
   -- TODO: wire container ops: "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)

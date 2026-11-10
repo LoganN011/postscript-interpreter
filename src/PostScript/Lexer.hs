@@ -1,6 +1,7 @@
 module PostScript.Lexer (parsePostScript) where
 
 import Data.Void (Void)
+import PostScript.Environment (isBuiltin)
 import PostScript.Types
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -8,13 +9,15 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 type Parser = Parsec Void String
 
--- Space consumer: skips spaces, tabs, newlines, and '%' line comments
+-- Space consumer: skips spaces, tabs, newlines, null bytes, and '%' line comments
 sc :: Parser ()
 sc =
   L.space
-    space1
+    (takeWhile1P (Just "whitespace") isPSWhitespace *> pure ())
     (L.skipLineComment "%")
     empty
+  where
+    isPSWhitespace c = c <= ' '
 
 -- Lexeme wrapper: consumes trailing whitespace after parser
 lexeme :: Parser a -> Parser a
@@ -26,26 +29,49 @@ symbol = L.symbol sc
 
 -- Reserved delimiter characters that cannot be part of standard identifiers
 isDelimiter :: Char -> Bool
-isDelimiter c = c `elem` (" \t\r\n%()<>[]{}/")
+isDelimiter c = c <= ' ' || c `elem` "%()<>[]{}/"
 
--- Parse an integer or floating-point real number
+-- Parse an integer or floating-point real number (including scientific notation)
 pNumber :: Parser Object
 pNumber = lexeme $ do
   sign <- optional (char '+' <|> char '-')
   let signMult = case sign of
         Just '-' -> -1.0
         _ -> 1.0
+  let pExp = (char 'e' <|> char 'E') *> ((:) <$> (char '+' <|> char '-' <|> digitChar) <*> many digitChar)
   leadingDigits <- optional (some digitChar)
   case leadingDigits of
     Just digits -> do
-      mDec <- optional (char '.' *> some digitChar)
-      case mDec of
-        Just frac -> return (PSReal (signMult * read (digits ++ "." ++ frac)))
-        Nothing -> return (PSInteger (round signMult * read digits))
+      mDec <- optional (char '.' *> many digitChar)
+      mExp <- optional pExp
+      case (mDec, mExp) of
+        (Nothing, Nothing) -> return (PSInteger (round signMult * read digits))
+        _ -> do
+          let fracStr = case mDec of
+                Just frac | not (null frac) -> frac
+                _ -> "0"
+              baseStr = digits ++ "." ++ fracStr
+              expStr = case mExp of
+                Just (c : rest) | c `elem` ['+', '-'] -> "e" ++ (c : rest)
+                Just ex -> "e+" ++ ex
+                Nothing -> ""
+          return (PSReal (signMult * read (baseStr ++ expStr)))
     Nothing -> do
       _ <- char '.'
       frac <- some digitChar
-      return (PSReal (signMult * read ("0." ++ frac)))
+      mExp <- optional pExp
+      let expStr = case mExp of
+            Just (c : rest) | c `elem` ['+', '-'] -> "e" ++ (c : rest)
+            Just ex -> "e+" ++ ex
+            Nothing -> ""
+      return (PSReal (signMult * read ("0." ++ frac ++ expStr)))
+
+-- Parse immediately evaluated names prefixed by '//' (e.g., //moveto)
+pImmName :: Parser Object
+pImmName = lexeme $ do
+  _ <- try (string "//")
+  name <- some (satisfy (not . isDelimiter))
+  return (if isBuiltin name then PSOperator name else PSSymbol name)
 
 -- Parse literal names prefixed by '/' (e.g., /x, /myProc)
 pName :: Parser Object
@@ -95,6 +121,7 @@ pObject =
   choice
     [ pBlock,
       pDelimOp,
+      pImmName,
       pName,
       pString,
       try pNumber,
