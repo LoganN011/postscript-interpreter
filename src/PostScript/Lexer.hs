@@ -1,6 +1,12 @@
-module PostScript.Lexer (parsePostScript) where
+module PostScript.Lexer
+  ( parsePostScript,
+    parseOneToken,
+  )
+where
 
+import Data.Char (isDigit, ord)
 import Data.Void (Void)
+import Numeric qualified
 import PostScript.Environment (isBuiltin)
 import PostScript.Types
 import Text.Megaparsec
@@ -42,20 +48,34 @@ pNumber = lexeme $ do
   leadingDigits <- optional (some digitChar)
   case leadingDigits of
     Just digits -> do
-      mDec <- optional (char '.' *> many digitChar)
-      mExp <- optional pExp
-      case (mDec, mExp) of
-        (Nothing, Nothing) -> return (PSInteger (round signMult * read digits))
-        _ -> do
-          let fracStr = case mDec of
-                Just frac | not (null frac) -> frac
-                _ -> "0"
-              baseStr = digits ++ "." ++ fracStr
-              expStr = case mExp of
-                Just (c : rest) | c `elem` ['+', '-'] -> "e" ++ (c : rest)
-                Just ex -> "e+" ++ ex
-                Nothing -> ""
-          return (PSReal (signMult * read (baseStr ++ expStr)))
+      mRadix <- optional (char '#' *> some alphaNumChar)
+      case mRadix of
+        Just rDigits -> do
+          let base = read digits :: Int
+              valDigit c
+                | isDigit c = ord c - ord '0'
+                | c >= 'a' && c <= 'z' = ord c - ord 'a' + 10
+                | c >= 'A' && c <= 'Z' = ord c - ord 'A' + 10
+                | otherwise = 999
+              isValidDigit c = valDigit c < base
+          case Numeric.readInt (fromIntegral base) isValidDigit valDigit rDigits of
+            [(val, "")] -> return (PSInteger (round signMult * val))
+            _ -> fail "invalid radix number"
+        Nothing -> do
+          mDec <- optional (char '.' *> many digitChar)
+          mExp <- optional pExp
+          case (mDec, mExp) of
+            (Nothing, Nothing) -> return (PSInteger (round signMult * read digits))
+            _ -> do
+              let fracStr = case mDec of
+                    Just frac | not (null frac) -> frac
+                    _ -> "0"
+                  baseStr = digits ++ "." ++ fracStr
+                  expStr = case mExp of
+                    Just (c : rest) | c `elem` ['+', '-'] -> "e" ++ (c : rest)
+                    Just ex -> "e+" ++ ex
+                    Nothing -> ""
+              return (PSReal (signMult * read (baseStr ++ expStr)))
     Nothing -> do
       _ <- char '.'
       frac <- some digitChar
@@ -80,12 +100,36 @@ pName = lexeme $ do
   name <- some (satisfy (not . isDelimiter))
   return (PSName name)
 
--- Parse string literals enclosed in parentheses
+-- Parse string literals enclosed in parentheses with balanced nested parens
 pString :: Parser Object
 pString = lexeme $ do
   _ <- char '('
-  str <- manyTill L.charLiteral (char ')')
+  str <- pStringContent
   return (PSString str)
+
+pStringContent :: Parser String
+pStringContent = concat <$> manyTill pChunk (char ')')
+  where
+    pChunk =
+      choice
+        [ try ((\inner -> "(" ++ inner ++ ")") <$> (char '(' *> pStringContent)),
+          (: [])
+            <$> choice
+              [ char '\\'
+                  *> choice
+                    [ char 'n' *> pure '\n',
+                      char 'r' *> pure '\r',
+                      char 't' *> pure '\t',
+                      char 'b' *> pure '\b',
+                      char 'f' *> pure '\f',
+                      char '\\' *> pure '\\',
+                      char '(' *> pure '(',
+                      char ')' *> pure ')',
+                      anySingle
+                    ],
+                noneOf "()"
+              ]
+        ]
 
 -- Parse deferred executable code blocks enclosed in curly braces
 pBlock :: Parser Object
@@ -138,3 +182,10 @@ parsePostScript input =
   case runParser pProgram "" input of
     Left bundle -> Left (errorBundlePretty bundle)
     Right objs -> Right objs
+
+-- Parses a single token from the front of an input string
+parseOneToken :: String -> Maybe (Object, String)
+parseOneToken input =
+  case runParser ((,) <$> (sc *> pObject) <*> getInput) "" input of
+    Right (obj, rest) -> Just (obj, rest)
+    Left _ -> Nothing

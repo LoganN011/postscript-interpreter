@@ -18,6 +18,7 @@ data Object
   | PSArray !Int
   | PSNull
   | PSMark
+  | PSSave !Int
   deriving (Show, Eq)
 
 -- 2D Affine Transformation Matrix
@@ -71,6 +72,7 @@ data PSState = PSState
     randSeed :: !Int,
     gState :: !GraphicsState,
     gStateStack :: ![GraphicsState],
+    saveSnapshots :: ![(Int, Map Int (Map String Object), Map Int [Object], GraphicsState)],
     canvasElements :: ![String],
     executionTerminated :: !Bool,
     loopExited :: !Bool,
@@ -111,13 +113,14 @@ initPSState :: PSState
 initPSState =
   PSState
     { operandStack = [],
-      dictStack = [0],
+      dictStack = [0, 0, 0],
       dictHeap = Map.singleton 0 defaultSystemDict,
       arrayHeap = Map.empty,
       nextId = 1,
       randSeed = 1,
       gState = initGraphicsState,
       gStateStack = [],
+      saveSnapshots = [],
       canvasElements = [],
       executionTerminated = False,
       loopExited = False,

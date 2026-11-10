@@ -8,6 +8,7 @@ module PostScript.Primitives.Stack
     psClear,
     psCount,
     psPstack,
+    psStack,
     psPrintEq,
     psPrintDebug,
     psPrint,
@@ -26,14 +27,26 @@ module PostScript.Primitives.Stack
     psEndArray,
     psStartDict,
     psEndDict,
+    psType,
+    psStringAlloc,
+    psCvlit,
+    psCvn,
+    psXcheck,
+    psCvs,
+    psCvrs,
+    psAnchorsearch,
+    psSearch,
     formatObject,
   )
 where
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (gets, modify)
+import Data.Char (intToDigit, toUpper)
+import Data.List (isPrefixOf)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Numeric (showIntAtBase)
 import PostScript.Environment (isBuiltin, loopWhile, newArray, newDict, peek, pop, popTwo, push, toCode)
 import PostScript.Primitives.Dictionary (toKey)
 import PostScript.Types
@@ -90,6 +103,9 @@ psCopy =
           xs <- gets (Map.findWithDefault [] src . arrayHeap)
           modify (\s -> s {arrayHeap = Map.adjust (\d -> xs ++ drop (length xs) d) dst (arrayHeap s)})
           push (PSArray dst)
+        PSBlock xs -> do
+          modify (\s -> s {arrayHeap = Map.adjust (\d -> xs ++ drop (length xs) d) dst (arrayHeap s)})
+          push (PSArray dst)
         _ -> error "copy type mismatch"
     PSDict dst ->
       pop >>= \case
@@ -113,6 +129,7 @@ psLength =
     PSArray aid -> gets (Map.findWithDefault [] aid . arrayHeap) >>= push . PSInteger . length
     PSDict did -> gets (Map.findWithDefault Map.empty did . dictHeap) >>= push . PSInteger . Map.size
     PSString s -> push (PSInteger (length s))
+    PSBlock objs -> push (PSInteger (length objs))
     _ -> error "length requires array, dict, or string"
 
 psGet :: Interpreter ()
@@ -128,6 +145,8 @@ psGet = do
       maybe (error ("key not found: " ++ toKey k)) push (Map.lookup (toKey k) d)
     (PSString s, PSInteger i) ->
       if i >= 0 && i < length s then push (PSInteger (fromEnum (s !! i))) else error "string index out of bounds"
+    (PSBlock xs, PSInteger i) ->
+      if i >= 0 && i < length xs then push (xs !! i) else error "block index out of bounds"
     _ -> error "invalid arguments to get"
 
 psPut :: Interpreter ()
@@ -140,6 +159,13 @@ psPut = do
       modify (\s -> s {arrayHeap = Map.adjust (\xs -> take i xs ++ [val] ++ drop (i + 1) xs) aid (arrayHeap s)})
     (PSDict did, _) ->
       modify (\s -> s {dictHeap = Map.adjust (Map.insert (toKey k) val) did (dictHeap s)})
+    (PSString s, PSInteger i) -> do
+      valByte <- case val of
+        PSInteger n -> return (toEnum (fromIntegral n `mod` 256) :: Char)
+        _ -> error "string put requires integer byte value"
+      if i >= 0 && i < length s
+        then mutateStringInState c (take i s ++ [valByte] ++ drop (i + 1) s)
+        else error "string put index out of bounds"
     _ -> error "invalid arguments to put"
 
 psForall :: ([Object] -> Interpreter ()) -> Interpreter ()
@@ -242,6 +268,12 @@ psPstack = do
   h <- gets arrayHeap
   mapM_ (\o -> outputStr (formatObject h True o ++ "\n")) st
 
+psStack :: Interpreter ()
+psStack = do
+  st <- gets operandStack
+  h <- gets arrayHeap
+  mapM_ (\o -> outputStr (formatObject h False o ++ "\n")) st
+
 psPrintEq :: Interpreter ()
 psPrintEq = do
   o <- pop
@@ -273,12 +305,166 @@ formatObject heap True obj = case obj of
   PSInteger n -> show n
   PSReal r -> show r
   PSBoolean b -> if b then "true" else "false"
-  PSString s -> "(" ++ s ++ ")"
+  PSString s -> "(" ++ escapeString s ++ ")"
   PSName s -> "/" ++ s
   PSSymbol s -> s
   PSOperator op -> "--" ++ op ++ "--"
   PSNull -> "null"
   PSMark -> "-mark-"
   PSDict _ -> "-dict-"
+  PSSave _ -> "-savelevel-"
   PSBlock objs -> "{" ++ unwords (map (formatObject heap True) objs) ++ "}"
   PSArray aid -> "[" ++ unwords (map (formatObject heap True) (Map.findWithDefault [] aid heap)) ++ "]"
+
+escapeString :: String -> String
+escapeString [] = []
+escapeString ('\0' : cs) = "\\000" ++ escapeString cs
+escapeString ('(' : cs) = "\\(" ++ escapeString cs
+escapeString (')' : cs) = "\\)" ++ escapeString cs
+escapeString ('\\' : cs) = "\\\\" ++ escapeString cs
+escapeString (c : cs) = c : escapeString cs
+
+-- 'type': any type -> name
+psType :: Interpreter ()
+psType =
+  pop >>= \obj -> push (PSSymbol (typeName obj))
+  where
+    typeName (PSInteger _) = "integertype"
+    typeName (PSReal _) = "realtype"
+    typeName (PSBoolean _) = "booleantype"
+    typeName (PSString _) = "stringtype"
+    typeName (PSArray _) = "arraytype"
+    typeName (PSDict _) = "dicttype"
+    typeName (PSSave _) = "savetype"
+    typeName (PSName _) = "nametype"
+    typeName (PSSymbol _) = "nametype"
+    typeName (PSOperator _) = "operatortype"
+    typeName (PSBlock _) = "arraytype"
+    typeName PSNull = "nulltype"
+    typeName PSMark = "marktype"
+
+-- 'string': int string -> string (allocate empty string of given length)
+psStringAlloc :: Interpreter ()
+psStringAlloc =
+  pop >>= \case
+    PSInteger n | n >= 0 -> push (PSString (replicate n '\0'))
+    _ -> error "string length must be non-negative integer"
+
+-- 'cvlit': any cvlit -> any (make object literal)
+psCvlit :: Interpreter ()
+psCvlit =
+  pop >>= \case
+    PSSymbol s -> push (PSName s)
+    PSBlock objs -> newArray objs >>= push
+    other -> push other
+
+-- 'cvn': string|name cvn -> name
+psCvn :: Interpreter ()
+psCvn =
+  pop >>= \case
+    PSString s -> push (PSName s)
+    PSName s -> push (PSName s)
+    PSSymbol s -> push (PSName s)
+    _ -> error "cvn requires string or name"
+
+-- 'xcheck': any xcheck -> bool (tests if object is executable)
+psXcheck :: Interpreter ()
+psXcheck =
+  pop >>= \case
+    PSBlock _ -> push (PSBoolean True)
+    PSSymbol _ -> push (PSBoolean True)
+    PSOperator _ -> push (PSBoolean True)
+    _ -> push (PSBoolean False)
+
+-- 'cvrs': num radix string cvrs -> substring
+psCvrs :: Interpreter ()
+psCvrs = do
+  strObj <- pop
+  radixObj <- pop
+  numObj <- pop
+  case (strObj, radixObj, numObj) of
+    (PSString s, PSInteger radix, num) | radix >= 2 && radix <= 36 -> do
+      let formatted = case num of
+            PSInteger n
+              | n < 0 -> '-' : map toUpper (showIntAtBase radix intToDigit (negate n) "")
+              | otherwise -> map toUpper (showIntAtBase radix intToDigit n "")
+            PSReal r
+              | radix == 10 -> show r
+              | fromIntegral (round r :: Int) == r ->
+                  let n = round r :: Int
+                   in if n < 0
+                        then '-' : map toUpper (showIntAtBase radix intToDigit (negate n) "")
+                        else map toUpper (showIntAtBase radix intToDigit n "")
+              | otherwise -> show r
+            _ -> error "cvrs expected number"
+      let newS = formatted ++ drop (length formatted) s
+      mutateStringInState strObj newS
+      push (PSString formatted)
+    _ -> error "cvrs arguments mismatch"
+
+-- 'anchorsearch': string seek anchorsearch -> post match true OR string false
+psAnchorsearch :: Interpreter ()
+psAnchorsearch = do
+  seekObj <- pop
+  strObj <- pop
+  case (strObj, seekObj) of
+    (PSString s, PSString seek) ->
+      if seek `isPrefixOf` s
+        then do
+          push (PSString (drop (length seek) s))
+          push (PSString seek)
+          push (PSBoolean True)
+        else do
+          push (PSString s)
+          push (PSBoolean False)
+    _ -> error "anchorsearch requires strings"
+
+-- 'search': string seek search -> post match pre true OR string false
+psSearch :: Interpreter ()
+psSearch = do
+  seekObj <- pop
+  strObj <- pop
+  case (strObj, seekObj) of
+    (PSString s, PSString seek) ->
+      case findSub seek s of
+        Just (pre, match, post) -> do
+          push (PSString post)
+          push (PSString match)
+          push (PSString pre)
+          push (PSBoolean True)
+        Nothing -> do
+          push (PSString s)
+          push (PSBoolean False)
+    _ -> error "search requires strings"
+  where
+    findSub needle haystack = go "" haystack
+      where
+        go _ [] = if null needle then Just ("", "", "") else Nothing
+        go acc str@(c : cs)
+          | needle `isPrefixOf` str = Just (reverse acc, needle, drop (length needle) str)
+          | otherwise = go (c : acc) cs
+
+-- 'cvs': any string cvs -> substring
+psCvs :: Interpreter ()
+psCvs = do
+  strObj <- pop
+  valObj <- pop
+  case strObj of
+    PSString s -> do
+      h <- gets arrayHeap
+      let formatted = formatObject h False valObj
+          newS = formatted ++ drop (length formatted) s
+      mutateStringInState strObj newS
+      push (PSString formatted)
+    _ -> error "cvs requires string"
+
+-- Mutates string in-place across stack and dictionaries
+mutateStringInState :: Object -> String -> Interpreter ()
+mutateStringInState oldObj newContent =
+  modify
+    ( \st ->
+        st
+          { operandStack = map (\o -> if o == oldObj then PSString newContent else o) (operandStack st),
+            dictHeap = fmap (fmap (\o -> if o == oldObj then PSString newContent else o)) (dictHeap st)
+          }
+    )

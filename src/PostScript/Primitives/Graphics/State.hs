@@ -78,17 +78,41 @@ psSave :: Interpreter ()
 psSave = do
   st <- get
   let sid = nextId st
-  modify (\s -> s {nextId = sid + 1, gStateStack = gState s : gStateStack s})
-  push (PSInteger sid)
+  modify
+    ( \s ->
+        s
+          { nextId = sid + 1,
+            saveSnapshots = (sid, dictHeap s, arrayHeap s, gState s) : saveSnapshots s,
+            gStateStack = gState s : gStateStack s
+          }
+    )
+  push (PSSave sid)
 
 -- 'restore': save restore -> (restores VM state snapshot)
 psRestore :: Interpreter ()
 psRestore = do
-  _ <- pop
-  st <- get
-  case gStateStack st of
-    (g : gs) -> put (st {gState = g, gStateStack = gs})
-    [] -> return ()
+  tok <- pop
+  let mSid = case tok of
+        PSSave sid -> Just sid
+        PSInteger sid -> Just sid
+        _ -> Nothing
+  case mSid of
+    Just sid -> do
+      st <- get
+      case dropWhile (\(i, _, _, _) -> i /= sid) (saveSnapshots st) of
+        ((_, dHeap, aHeap, gs) : rest) ->
+          put
+            ( st
+                { dictHeap = dHeap,
+                  arrayHeap = aHeap,
+                  gState = gs,
+                  saveSnapshots = rest
+                }
+            )
+        [] -> case gStateStack st of
+          (g : gs) -> put (st {gState = g, gStateStack = gs})
+          [] -> return ()
+    Nothing -> error "restore expected save object"
 
 -- Color operators
 

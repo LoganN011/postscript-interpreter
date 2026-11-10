@@ -2,7 +2,7 @@ module PostScript.Primitives.Control where
 
 import Control.Monad.State.Strict (modify)
 import Data.Bits (complement, shift, xor, (.&.), (.|.))
-import Data.Word (Word32)
+import Data.Int (Int32)
 import PostScript.Environment (isBuiltin, lookupDict, loopWhile, pop, push, toCode)
 import PostScript.Types
 
@@ -109,8 +109,8 @@ psBitshift = do
   n <- pop
   case (n, s) of
     (PSInteger x, PSInteger shiftAmt) ->
-      let w = fromIntegral x :: Word32
-          res = shift w shiftAmt
+      let i = fromIntegral x :: Int32
+          res = shift i shiftAmt
        in push (PSInteger (fromIntegral res))
     _ -> error "Type error: bitshift arguments must be integers"
 

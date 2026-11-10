@@ -118,9 +118,9 @@ isBuiltin :: String -> Bool
 isBuiltin s =
   s
     `elem` words
-      "pop dup exch index roll copy clear count pstack array length get put forall aload astore [ ] << >> mark counttomark cleartomark = == print quit \
-      \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log cvi rand srand rrand bitshift usertime \
-      \def dict begin end known load where cleardictstack userdict eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind cvx \
+      "pop dup exch index roll copy clear count pstack stack array length get put forall aload astore [ ] << >> mark counttomark cleartomark = == print quit \
+      \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log cvi cvr rand srand rrand bitshift usertime \
+      \def dict begin end known load where cleardictstack userdict systemdict currentdict countdictstack dictstack maxlength undef store eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind cvx cvlit cvn xcheck type string cvs cvrs anchorsearch search token \
       \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform \
       \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall clippath \
       \gsave grestore grestoreall save restore setrgbcolor setgray setcmykcolor sethsbcolor currentrgbcolor currentgray currentlinewidth currentmiterlimit setlinewidth setlinecap setlinejoin setmiterlimit setdash stroke fill eofill clip showpage"

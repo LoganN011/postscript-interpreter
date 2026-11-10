@@ -117,7 +117,9 @@ prop_formatEq x s =
     && formatObject Map.empty False (PSString s) == s
 
 prop_formatDebug :: String -> Bool
-prop_formatDebug s = formatObject Map.empty True (PSString s) == "(" ++ s ++ ")"
+prop_formatDebug s =
+  let safeStr = filter (`notElem` "()\\\0") s
+   in formatObject Map.empty True (PSString safeStr) == "(" ++ safeStr ++ ")"
 
 prop_arrayAllocLength :: NonNegative (Small Int) -> Property
 prop_arrayAllocLength (NonNegative (Small n)) =

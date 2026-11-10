@@ -10,7 +10,7 @@ where
 import Control.Exception (SomeException, displayException, try)
 import Control.Monad (unless)
 import Control.Monad.State.Strict (execStateT, gets)
-import PostScript.Environment (lookupDict, push)
+import PostScript.Environment (lookupDict, pop, push)
 import PostScript.Primitives.Control
   ( psAnd,
     psBind,
@@ -35,11 +35,18 @@ import PostScript.Primitives.Control
 import PostScript.Primitives.Dictionary
   ( psBegin,
     psCleardictstack,
+    psCountdictstack,
+    psCurrentdict,
     psDef,
     psDict,
+    psDictstack,
     psEnd,
     psKnown,
     psLoad,
+    psMaxlength,
+    psStore,
+    psSystemdict,
+    psUndef,
     psUserdict,
     psWhere,
   )
@@ -104,6 +111,7 @@ import PostScript.Primitives.Graphics.Transform
     psTransform,
     psTranslate,
   )
+import PostScript.Lexer (parseOneToken)
 import PostScript.Primitives.Math
   ( psAbs,
     psAdd,
@@ -111,6 +119,7 @@ import PostScript.Primitives.Math
     psCeiling,
     psCos,
     psCvi,
+    psCvr,
     psDiv,
     psExp,
     psFloor,
@@ -132,6 +141,7 @@ import PostScript.Primitives.Math
   )
 import PostScript.Primitives.Stack
   ( psAload,
+    psAnchorsearch,
     psArray,
     psAstore,
     psClear,
@@ -139,6 +149,10 @@ import PostScript.Primitives.Stack
     psCopy,
     psCount,
     psCountToMark,
+    psCvlit,
+    psCvn,
+    psCvs,
+    psCvrs,
     psCvx,
     psDup,
     psEndArray,
@@ -157,7 +171,12 @@ import PostScript.Primitives.Stack
     psPut,
     psQuit,
     psRoll,
+    psSearch,
+    psStack,
     psStartDict,
+    psStringAlloc,
+    psType,
+    psXcheck,
   )
 import PostScript.Types (Interpreter, Object (..), PSState (..), defaultSystemDict)
 
@@ -198,8 +217,10 @@ executeBuiltin name = case name of
   "clear" -> psClear
   "count" -> psCount
   "pstack" -> psPstack
+  "stack" -> psStack
   -- Container & Array Primitives
   "array" -> psArray
+  "string" -> psStringAlloc
   "length" -> psLength
   "get" -> psGet
   "put" -> psPut
@@ -207,6 +228,15 @@ executeBuiltin name = case name of
   "aload" -> psAload
   "astore" -> psAstore
   "cvx" -> psCvx
+  "cvlit" -> psCvlit
+  "cvn" -> psCvn
+  "xcheck" -> psXcheck
+  "type" -> psType
+  "cvs" -> psCvs
+  "cvrs" -> psCvrs
+  "anchorsearch" -> psAnchorsearch
+  "search" -> psSearch
+  "token" -> psToken
   "[" -> psMark
   "]" -> psEndArray
   "<<" -> psStartDict
@@ -233,6 +263,7 @@ executeBuiltin name = case name of
   "round" -> psRound
   "truncate" -> psTruncate
   "cvi" -> psCvi
+  "cvr" -> psCvr
   "rand" -> psRand
   "srand" -> psSrand
   "rrand" -> psRrand
@@ -255,6 +286,13 @@ executeBuiltin name = case name of
   "where" -> psWhere
   "cleardictstack" -> psCleardictstack
   "userdict" -> psUserdict
+  "systemdict" -> psSystemdict
+  "currentdict" -> psCurrentdict
+  "countdictstack" -> psCountdictstack
+  "dictstack" -> psDictstack
+  "maxlength" -> psMaxlength
+  "undef" -> psUndef
+  "store" -> psStore
   -- Relational & Boolean Primitives
   "eq" -> psEq
   "ne" -> psNe
@@ -333,9 +371,20 @@ executeBuiltin name = case name of
   "eofill" -> psEofill
   "clip" -> psClip
   "showpage" -> psShowpage
-  -- TODO: wire container ops: "string", "cvs"
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
+
+-- 'token': string token -> post token true OR false
+psToken :: Interpreter ()
+psToken = do
+  pop >>= \case
+    PSString s -> case parseOneToken s of
+      Just (obj, rest) -> do
+        push (PSString rest)
+        push obj
+        push (PSBoolean True)
+      Nothing -> push (PSBoolean False)
+    _ -> error "token requires string"
 
 -- Top-level runner that executes an object stream from an initial state
 runInterpreter :: [Object] -> PSState -> IO (Either String PSState)

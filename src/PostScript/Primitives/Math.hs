@@ -12,6 +12,7 @@ module PostScript.Primitives.Math
     psRound,
     psTruncate,
     psCvi,
+    psCvr,
     psRand,
     psSrand,
     psRrand,
@@ -136,12 +137,12 @@ psFloor = do
     Just r -> push (PSReal (fromIntegral (floor r :: Integer)))
     Nothing -> error "type error: arguement must be numbers in floor"
 
--- 'round': num1 round -> nearest integer (as real)
+-- 'round': num1 round -> nearest integer (as real, greater of two if tied)
 psRound :: Interpreter ()
 psRound = do
   val <- pop
   case toDouble val of
-    Just r -> push (PSReal (fromIntegral (round r :: Integer)))
+    Just r -> push (PSReal (fromIntegral (floor (r + 0.5) :: Integer)))
     Nothing -> error "type error: arguement must be numbers in round"
 
 -- 'truncate': num1 truncate -> integer part truncated toward zero (as real)
@@ -180,7 +181,10 @@ psCos :: Interpreter ()
 psCos = do
   val <- pop
   case toDouble val of
-    Just deg -> push (PSReal (cos (deg * pi / 180.0)))
+    Just deg ->
+      let res = cos (deg * pi / 180.0)
+          clean = if abs res < 1e-12 then 0.0 else res
+       in push (PSReal clean)
     Nothing -> error "type error: arguements must be numbers in Cos"
 
 -- 'sin': angle(deg) sin -> sine
@@ -188,7 +192,10 @@ psSin :: Interpreter ()
 psSin = do
   val <- pop
   case toDouble val of
-    Just deg -> push (PSReal (sin (deg * pi / 180.0)))
+    Just deg ->
+      let res = sin (deg * pi / 180.0)
+          clean = if abs res < 1e-12 then 0.0 else res
+       in push (PSReal clean)
     Nothing -> error "Type error: arguements must be numbers in sin"
 
 -- 'exp': base exp -> base^exp
@@ -226,10 +233,25 @@ psCvi =
   pop >>= \case
     PSInteger n -> push (PSInteger n)
     PSReal r -> push (PSInteger (truncate r))
-    PSString s -> case reads s of
+    PSString s -> case reads s :: [(Int, String)] of
       [(n, "")] -> push (PSInteger n)
-      _ -> error "typecheck: cvi string parse error"
+      _ -> case reads s :: [(Double, String)] of
+        [(d, "")] -> push (PSInteger (truncate d))
+        _ -> error "typecheck: cvi string parse error"
     _ -> error "typecheck: cvi expected number or string"
+
+-- 'cvr': num | string cvr -> real
+psCvr :: Interpreter ()
+psCvr =
+  pop >>= \case
+    PSInteger n -> push (PSReal (fromIntegral n))
+    PSReal r -> push (PSReal r)
+    PSString s -> case reads s :: [(Double, String)] of
+      [(d, "")] -> push (PSReal d)
+      _ -> case reads s :: [(Int, String)] of
+        [(n, "")] -> push (PSReal (fromIntegral n))
+        _ -> error "typecheck: cvr string parse error"
+    _ -> error "typecheck: cvr expected number or string"
 
 -- 'rand': -> int (pseudo-random integer in range [0, 2^31-1])
 psRand :: Interpreter ()
