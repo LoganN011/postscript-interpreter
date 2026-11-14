@@ -12,14 +12,13 @@ module PostScript.Environment
     getGState,
     modifyGState,
     toCode,
+    runLoopStep,
     loopWhile,
     isBuiltin,
   )
 where
 
-import Control.Monad (unless)
-import Control.Monad.State.Strict (gets, modify)
-import Data.Foldable (asum)
+import Control.Monad.State.Strict (get, gets, modify, state)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import PostScript.Types
@@ -30,30 +29,31 @@ push obj = modify (\s -> s {operandStack = obj : operandStack s})
 
 -- Pop Object off the operand stack
 pop :: Interpreter Object
-pop = do
-  st <- gets operandStack
-  case st of
-    (x : xs) -> modify (\s -> s {operandStack = xs}) >> return x
-    [] -> error "stack empty"
+pop = state $ \s -> case operandStack s of
+  (x : xs) -> (x, s {operandStack = xs})
+  [] -> error "stack empty"
 
 -- Look at the top Object on the operand stack
 peek :: Interpreter Object
-peek =
-  gets operandStack >>= \case
-    (x : _) -> return x
-    [] -> error "stack empty on peek"
+peek = gets $ \s -> case operandStack s of
+  (x : _) -> x
+  [] -> error "stack empty on peek"
 
 -- Pop top two items of the operand stack: returns (top, second)
 popTwo :: Interpreter (Object, Object)
-popTwo = do
-  top <- pop
-  second <- pop
-  return (top, second)
+popTwo = state $ \s -> case operandStack s of
+  (x : y : xs) -> ((x, y), s {operandStack = xs})
+  _ -> error "stack empty on popTwo"
 
 -- Search the dictionary stack from top to bottom
 lookupDict :: String -> Interpreter (Maybe Object)
 lookupDict key = gets $ \s ->
-  asum [Map.lookup key d | did <- dictStack s, Just d <- [Map.lookup did (dictHeap s)]]
+  let heap = dictHeap s
+      go [] = Nothing
+      go (did : rest) = case Map.lookup did heap >>= Map.lookup key of
+        Just val -> Just val
+        Nothing -> go rest
+   in go (dictStack s)
 
 -- Bind a key-value pair in the active (top) dictionary
 defineSymbol :: String -> Object -> Interpreter ()
@@ -100,18 +100,26 @@ toCode :: Object -> [Object]
 toCode (PSBlock objs) = objs
 toCode obj = [obj]
 
+-- | Step an action within a loop body, stopping early on exit or termination
+runLoopStep :: Interpreter () -> Interpreter () -> Interpreter ()
+runLoopStep action onContinue = do
+  action
+  st <- get
+  if loopExited st
+    then modify (\s -> s {loopExited = False})
+    else
+      if executionTerminated st
+        then return ()
+        else onContinue
+
 -- Execute a sequence of loop iterations, stopping early on quit or exit
 loopWhile :: [Interpreter ()] -> Interpreter ()
 loopWhile [] = return ()
 loopWhile (action : rest) = do
-  term <- gets executionTerminated
-  ex <- gets loopExited
-  unless (term || ex) $ do
-    action
-    ex' <- gets loopExited
-    if ex'
-      then modify (\s -> s {loopExited = False})
-      else loopWhile rest
+  s <- get
+  if executionTerminated s || loopExited s
+    then return ()
+    else runLoopStep action (loopWhile rest)
 
 -- Check whether a symbol name is a recognized built-in operator
 isBuiltin :: String -> Bool
@@ -122,5 +130,6 @@ isBuiltin s =
       \add sub mul div idiv mod neg abs ceiling floor round truncate sqrt atan cos sin exp ln log cvi cvr rand srand rrand bitshift usertime \
       \def dict begin end known load where cleardictstack userdict systemdict currentdict countdictstack dictstack maxlength undef store eq ne gt ge lt le and or not xor if ifelse repeat for exec loop exit bind cvx cvlit cvn xcheck type string cvs cvrs anchorsearch search token \
       \matrix initmatrix defaultmatrix identmatrix currentmatrix setmatrix translate scale rotate concat concatmatrix invertmatrix transform itransform dtransform idtransform \
-      \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall clippath \
-      \gsave grestore grestoreall save restore setrgbcolor setgray setcmykcolor sethsbcolor currentrgbcolor currentgray currentlinewidth currentmiterlimit setlinewidth setlinecap setlinejoin setmiterlimit setdash stroke fill eofill clip showpage"
+      \newpath moveto rmoveto lineto rlineto curveto rcurveto arc arcn arcto closepath currentpoint pathbbox flattenpath pathforall clippath strokepath \
+      \findfont scalefont setfont currentfont show ashow widthshow awidthshow kshow stringwidth charpath makefont definefont \
+      \gsave grestore grestoreall save restore setrgbcolor setgray setcmykcolor sethsbcolor currentrgbcolor currentgray currentlinewidth currentmiterlimit setlinewidth setlinecap setlinejoin setmiterlimit setdash stroke fill eofill clip eoclip initclip showpage"

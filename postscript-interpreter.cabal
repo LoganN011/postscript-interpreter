@@ -71,7 +71,7 @@ library
         PostScript.Primitives.Graphics.Path
         PostScript.Primitives.Graphics.State
         PostScript.Primitives.Graphics.Render
-        -- PostScript.Primitives.Graphics.Text
+        PostScript.Primitives.Graphics.Text
     hs-source-dirs:   src
     build-depends:
         base >= 4.14 && < 5,
@@ -112,9 +112,34 @@ executable postscript-interpreter
     -- Other library packages from which modules are imported.
     build-depends:    
         base ^>=4.20.2.0,
+        directory,
+        filepath,
         postscript-interpreter
     -- Directories containing source files.
     hs-source-dirs:   app
 
     -- Base language which the package is written in.
+    default-language: GHC2024
+
+executable postscript-gui
+    import:           warnings
+    main-is:          Main.hs
+    other-modules:
+        Types
+        GlossRender
+        ImageLoader
+        TestBrowser
+    hs-source-dirs:   app-gui
+    build-depends:
+        base >= 4.14 && < 5,
+        postscript-interpreter,
+        gloss >= 1.13,
+        JuicyPixels >= 3.3,
+        bmp >= 1.2,
+        bytestring,
+        vector,
+        containers,
+        filepath,
+        directory,
+        process
     default-language: GHC2024

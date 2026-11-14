@@ -4,18 +4,21 @@ module PostScript.Primitives.Graphics.Render
     renderFillToSVG,
     renderTextToSVG,
     generateSVGDocument,
+    renderCommandToSVG,
+    splitByPages,
+    renderAllPagesToSVG,
   )
 where
 
-import Data.List (intercalate)
-import PostScript.Types (GraphicsState (..), PathSegment (..))
-import Text.Printf (printf)
+import PostScript.Types (GraphicCommand (..), GraphicsState (..), PathSegment (..))
 
 -- Format number cleanly without unnecessary trailing decimals
 fmtD :: Double -> String
 fmtD d
   | fromIntegral (round d :: Int) == d = show (round d :: Int)
-  | otherwise = printf "%.3f" d
+  | otherwise =
+      let rounded = fromIntegral (round (d * 1000.0) :: Int) / 1000.0 :: Double
+       in show rounded
 
 -- Convert path segments to SVG path data d="..."
 renderPathToSVG :: [PathSegment] -> String
@@ -46,15 +49,21 @@ renderPathToSVG segs = unwords (map segToSVG segs)
 -- Format RGB color as "rgb(r, g, b)"
 fmtRGB :: (Double, Double, Double) -> String
 fmtRGB (r, g, b) =
-  let clamp255 v = round (max 0.0 (min 1.0 v) * 255.0) :: Int
-   in printf "rgb(%d,%d,%d)" (clamp255 r) (clamp255 g) (clamp255 b)
+  let c255 v = show (round (max 0.0 (min 1.0 v) * 255.0) :: Int)
+   in "rgb(" ++ c255 r ++ "," ++ c255 g ++ "," ++ c255 b ++ ")"
+
+-- Comma separated list of strings
+joinComma :: [String] -> String
+joinComma [] = ""
+joinComma [x] = x
+joinComma (x : xs) = x ++ "," ++ joinComma xs
 
 -- Format stroke attributes (color, width, dash, cap, join)
 renderStrokeToSVG :: GraphicsState -> [PathSegment] -> String
 renderStrokeToSVG gs segs =
   let dAttr = renderPathToSVG segs
       color = fmtRGB (rgbColor gs)
-      w = fmtD (lineWidth gs)
+      w = fmtD (if lineWidth gs <= 0 then 1.0 else lineWidth gs)
       cap = case lineCap gs of
         1 -> "round"
         2 -> "square"
@@ -70,7 +79,7 @@ renderStrokeToSVG gs segs =
       dashAttr =
         if null (dashArray gs)
           then ""
-          else " stroke-dasharray=\"" ++ intercalate "," (map fmtD (dashArray gs)) ++ "\""
+          else " stroke-dasharray=\"" ++ joinComma (map fmtD (dashArray gs)) ++ "\""
       dashOffsetAttr =
         if dashOffset gs == 0.0
           then ""
@@ -148,3 +157,30 @@ generateSVGDocument w h elems =
       "  </g>",
       "</svg>"
     ]
+
+-- Convert a GraphicCommand into an SVG string element, ignoring page boundaries
+renderCommandToSVG :: GraphicCommand -> Maybe String
+renderCommandToSVG (DrawStroke gs segs) = Just (renderStrokeToSVG gs segs)
+renderCommandToSVG (DrawFill gs isEvenOdd segs) = Just (renderFillToSVG gs isEvenOdd segs)
+renderCommandToSVG (DrawText gs pt txt) = Just (renderTextToSVG gs pt txt)
+renderCommandToSVG DrawPage = Nothing
+
+-- Partition GraphicCommands into pages delimited by DrawPage
+splitByPages :: [GraphicCommand] -> [[GraphicCommand]]
+splitByPages = go []
+  where
+    go curr [] = if null curr then [] else [reverse curr]
+    go curr (DrawPage : rest) =
+      let p = reverse curr
+          restPages = go [] rest
+       in if null p then restPages else p : restPages
+    go curr (c : rest) = go (c : curr) rest
+
+-- Render all pages in GraphicCommands to separate SVG documents
+renderAllPagesToSVG :: Double -> Double -> [GraphicCommand] -> [String]
+renderAllPagesToSVG w h cmds =
+  let pages = splitByPages cmds
+      renderOnePage pCmds =
+        let elems = [s | c <- pCmds, Just s <- [renderCommandToSVG c]]
+         in generateSVGDocument w h elems
+   in map renderOnePage pages

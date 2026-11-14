@@ -6,7 +6,6 @@ where
 
 import Data.Char (isDigit, ord)
 import Data.Void (Void)
-import Numeric qualified
 import PostScript.Environment (isBuiltin)
 import PostScript.Types
 import Text.Megaparsec
@@ -57,10 +56,11 @@ pNumber = lexeme $ do
                 | c >= 'a' && c <= 'z' = ord c - ord 'a' + 10
                 | c >= 'A' && c <= 'Z' = ord c - ord 'A' + 10
                 | otherwise = 999
-              isValidDigit c = valDigit c < base
-          case Numeric.readInt (fromIntegral base) isValidDigit valDigit rDigits of
-            [(val, "")] -> return (PSInteger (round signMult * val))
-            _ -> fail "invalid radix number"
+          if any (\c -> valDigit c >= base) rDigits
+            then fail "invalid radix number"
+            else
+              let val = foldl (\acc c -> acc * base + valDigit c) 0 rDigits
+               in return (PSInteger (round signMult * val))
         Nothing -> do
           mDec <- optional (char '.' *> many digitChar)
           mExp <- optional pExp

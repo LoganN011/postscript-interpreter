@@ -8,7 +8,7 @@ import PostScript (executeScript)
 import PostScript.Evaluator (runInterpreter)
 import PostScript.Lexer (parsePostScript)
 import PostScript.Primitives.Stack (formatObject)
-import PostScript.Types (Object (..), PSState (..), initPSState)
+import PostScript.Types (GraphicCommand (..), GraphicsState (..), Object (..), PSState (..), initPSState)
 import System.Directory (listDirectory)
 import System.Exit (ExitCode (..), exitFailure, exitSuccess)
 import System.FilePath (takeFileName, (</>))
@@ -552,6 +552,62 @@ prop_trailingDotParsesReal =
   "72. 300. div"
     `runsTo` [PSReal 0.24]
 
+-- Text Primitives Properties
+prop_showAdvancesCurrentpoint :: Property
+prop_showAdvancesCurrentpoint = ioProperty $ do
+  res <- evalScript "/Helvetica findfont 10 scalefont setfont 100 200 moveto (ABC) show currentpoint"
+  pure $ case res of
+    Right (_, [PSReal y, PSReal x]) -> y == 200.0 && x > 100.0
+    _ -> False
+
+prop_stringwidthMeasuresAdvance :: Property
+prop_stringwidthMeasuresAdvance = ioProperty $ do
+  res <- evalScript "/Helvetica findfont 12 scalefont setfont (Test) stringwidth"
+  pure $ case res of
+    Right (_, [PSReal wy, PSReal wx]) -> wy == 0.0 && wx > 0.0
+    _ -> False
+
+prop_showEmitsDrawTextAndSVG :: Property
+prop_showEmitsDrawTextAndSVG = ioProperty $ do
+  res <- executeScript "10 20 moveto (Hello) show"
+  pure $ case res of
+    Right st ->
+      case (graphicCommands st, canvasElements st) of
+        ([DrawText _ (10.0, 20.0) "Hello"], [svg]) -> "<text " `isInfixOf` svg && "Hello</text>" `isInfixOf` svg
+        _ -> False
+    Left _ -> False
+
+prop_ashowAdvancesWithSpacing :: Property
+prop_ashowAdvancesWithSpacing = ioProperty $ do
+  res <- evalScript "/Helvetica findfont 10 scalefont setfont 0 0 moveto 5 2 (AB) ashow currentpoint"
+  pure $ case res of
+    Right (_, [PSReal y, PSReal x]) ->
+      abs (y - 4.0) < 1e-4 && x > 20.0
+    _ -> False
+
+prop_kshowExecutesProcBetweenChars :: Property
+prop_kshowExecutesProcBetweenChars = ioProperty $ do
+  res <- evalScript "0 0 moveto /cnt 0 def { pop pop /cnt cnt 1 add def } (ABC) kshow cnt"
+  pure $ case res of
+    Right (_, [PSInteger 2]) -> True
+    _ -> False
+
+prop_charpathAppendsSubpaths :: Property
+prop_charpathAppendsSubpaths = ioProperty $ do
+  res <- executeScript "/Helvetica findfont 100 scalefont setfont 0 0 moveto (text) false charpath"
+  pure $ case res of
+    Right st -> not (null (currentPath (gState st)))
+    _ -> False
+
+prop_arcTransformsElliptically :: Property
+prop_arcTransformsElliptically = ioProperty $ do
+  res <- executeScript "0.8 1 scale 0 0 100 0 360 arc"
+  pure $ case res of
+    Right st ->
+      let p = currentPath (gState st)
+       in length p >= 4
+    _ -> False
+
 -- Section 2: Integration tests verifying final operand stack
 testPrograms :: [(FilePath, [Object])]
 testPrograms =
@@ -719,7 +775,14 @@ main = do
         runQC "Util: cleardictstack resets dictionary stack to root" prop_cleardictstackResetsStack,
         runQC "Util: usertime returns non-negative execution time" prop_usertimeReturnsInt,
         runQC "Util: userdict pushes base dictionary" prop_userdictPushesRootDict,
-        runQC "Util: trailing dot numbers parse as reals" prop_trailingDotParsesReal
+        runQC "Util: trailing dot numbers parse as reals" prop_trailingDotParsesReal,
+        runQC "Text: show advances currentpoint horizontally" prop_showAdvancesCurrentpoint,
+        runQC "Text: stringwidth measures advance width" prop_stringwidthMeasuresAdvance,
+        runQC "Text: show emits DrawText command and SVG element" prop_showEmitsDrawTextAndSVG,
+        runQC "Text: ashow advances with character spacing" prop_ashowAdvancesWithSpacing,
+        runQC "Text: kshow executes proc between character pairs" prop_kshowExecutesProcBetweenChars,
+        runQC "Text: charpath appends glyph outline paths" prop_charpathAppendsSubpaths,
+        runQC "Path: arc under non-uniform CTM transforms into Bézier curves" prop_arcTransformsElliptically
       ]
   let allQcPassed = and qcResults
 

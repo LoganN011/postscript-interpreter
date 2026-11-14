@@ -50,7 +50,8 @@ data GraphicsState = GraphicsState
     dashArray :: ![Double],
     dashOffset :: !Double,
     fontName :: !String,
-    fontSize :: !Double
+    fontSize :: !Double,
+    clipPath :: !(Maybe [PathSegment])
   }
   deriving (Show, Eq)
 
@@ -61,6 +62,14 @@ defaultSystemDict =
     [ ("true", PSBoolean True),
       ("false", PSBoolean False)
     ]
+
+-- Intermediate representation for graphic painting actions
+data GraphicCommand
+  = DrawStroke GraphicsState [PathSegment]
+  | DrawFill GraphicsState Bool [PathSegment]
+  | DrawText GraphicsState (Double, Double) String
+  | DrawPage
+  deriving (Show, Eq)
 
 -- Top-level global interpreter execution state
 data PSState = PSState
@@ -74,6 +83,7 @@ data PSState = PSState
     gStateStack :: ![GraphicsState],
     saveSnapshots :: ![(Int, Map Int (Map String Object), Map Int [Object], GraphicsState)],
     canvasElements :: ![String],
+    graphicCommands :: ![GraphicCommand],
     executionTerminated :: !Bool,
     loopExited :: !Bool,
     printAction :: String -> IO ()
@@ -105,7 +115,8 @@ initGraphicsState =
       dashArray = [],
       dashOffset = 0.0,
       fontName = "Helvetica",
-      fontSize = 10.0
+      fontSize = 10.0,
+      clipPath = Nothing
     }
 
 -- Default initial interpreter state
@@ -122,6 +133,7 @@ initPSState =
       gStateStack = [],
       saveSnapshots = [],
       canvasElements = [],
+      graphicCommands = [],
       executionTerminated = False,
       loopExited = False,
       printAction = putStr

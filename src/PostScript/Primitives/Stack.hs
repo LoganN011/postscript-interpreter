@@ -42,11 +42,8 @@ where
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (gets, modify)
-import Data.Char (intToDigit, toUpper)
-import Data.List (isPrefixOf)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
-import Numeric (showIntAtBase)
 import PostScript.Environment (isBuiltin, loopWhile, newArray, newDict, peek, pop, popTwo, push, toCode)
 import PostScript.Primitives.Dictionary (toKey)
 import PostScript.Types
@@ -377,6 +374,19 @@ psXcheck =
     _ -> push (PSBoolean False)
 
 -- 'cvrs': num radix string cvrs -> substring
+-- Convert an integer to string in a given base (2 to 36)
+showInRadix :: Int -> Int -> String
+showInRadix radix num
+  | num < 0 = '-' : toDigits (-num)
+  | otherwise = toDigits num
+  where
+    digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    toDigits 0 = "0"
+    toDigits n = reverse (go n)
+      where
+        go 0 = ""
+        go x = (digits !! (x `mod` radix)) : go (x `div` radix)
+
 psCvrs :: Interpreter ()
 psCvrs = do
   strObj <- pop
@@ -385,16 +395,10 @@ psCvrs = do
   case (strObj, radixObj, numObj) of
     (PSString s, PSInteger radix, num) | radix >= 2 && radix <= 36 -> do
       let formatted = case num of
-            PSInteger n
-              | n < 0 -> '-' : map toUpper (showIntAtBase radix intToDigit (negate n) "")
-              | otherwise -> map toUpper (showIntAtBase radix intToDigit n "")
+            PSInteger n -> showInRadix radix n
             PSReal r
               | radix == 10 -> show r
-              | fromIntegral (round r :: Int) == r ->
-                  let n = round r :: Int
-                   in if n < 0
-                        then '-' : map toUpper (showIntAtBase radix intToDigit (negate n) "")
-                        else map toUpper (showIntAtBase radix intToDigit n "")
+              | fromIntegral (round r :: Int) == r -> showInRadix radix (round r :: Int)
               | otherwise -> show r
             _ -> error "cvrs expected number"
       let newS = formatted ++ drop (length formatted) s
@@ -409,7 +413,7 @@ psAnchorsearch = do
   strObj <- pop
   case (strObj, seekObj) of
     (PSString s, PSString seek) ->
-      if seek `isPrefixOf` s
+      if take (length seek) s == seek
         then do
           push (PSString (drop (length seek) s))
           push (PSString seek)
@@ -441,7 +445,7 @@ psSearch = do
       where
         go _ [] = if null needle then Just ("", "", "") else Nothing
         go acc str@(c : cs)
-          | needle `isPrefixOf` str = Just (reverse acc, needle, drop (length needle) str)
+          | take (length needle) str == needle = Just (reverse acc, needle, drop (length needle) str)
           | otherwise = go (c : acc) cs
 
 -- 'cvs': any string cvs -> substring

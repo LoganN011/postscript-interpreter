@@ -4,5 +4,7 @@ cradle:
       component: "lib:postscript-interpreter"
     - path: "app"
       component: "exe:postscript-interpreter"
+    - path: "app-gui"
+      component: "exe:postscript-gui"
     - path: "test"
       component: "test:postscript-interpreter-test"

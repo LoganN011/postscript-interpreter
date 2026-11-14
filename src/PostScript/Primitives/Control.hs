@@ -2,8 +2,7 @@ module PostScript.Primitives.Control where
 
 import Control.Monad.State.Strict (modify)
 import Data.Bits (complement, shift, xor, (.&.), (.|.))
-import Data.Int (Int32)
-import PostScript.Environment (isBuiltin, lookupDict, loopWhile, pop, push, toCode)
+import PostScript.Environment (isBuiltin, lookupDict, pop, push, runLoopStep, toCode)
 import PostScript.Types
 
 -- extract numeric values as Double
@@ -109,9 +108,7 @@ psBitshift = do
   n <- pop
   case (n, s) of
     (PSInteger x, PSInteger shiftAmt) ->
-      let i = fromIntegral x :: Int32
-          res = shift i shiftAmt
-       in push (PSInteger (fromIntegral res))
+      push (PSInteger (shift x shiftAmt))
     _ -> error "Type error: bitshift arguments must be integers"
 
 -- 'if': bool proc if ->
@@ -137,7 +134,11 @@ psRepeat :: ([Object] -> Interpreter ()) -> Interpreter ()
 psRepeat evalProg = do
   code <- toCode <$> pop
   pop >>= \case
-    PSInteger n | n >= 0 -> loopWhile (replicate n (evalProg code))
+    PSInteger n
+      | n >= 0 ->
+          let go 0 = return ()
+              go count = runLoopStep (evalProg code) (go (count - 1))
+           in go n
     _ -> error "Type error: repeat expected non-negative int and proc"
 
 -- 'for': init step limit proc for ->
@@ -147,23 +148,24 @@ psFor evalProg = do
   lim <- pop
   step <- pop
   initObj <- pop
+  let runFor :: (Num a, Ord a) => (a -> Object) -> a -> a -> a -> Interpreter ()
+      runFor mkVal curr s l
+        | (s > 0 && curr <= l) || (s < 0 && curr >= l) =
+            runLoopStep (push (mkVal curr) >> evalProg code) (runFor mkVal (curr + s) s l)
+        | otherwise = return ()
+
   case (initObj, step, lim) of
-    (PSInteger i, PSInteger s, PSInteger l) ->
-      loopWhile [push (PSInteger n) >> evalProg code | n <- forRange i s l]
+    (PSInteger i, PSInteger s, PSInteger l) -> runFor PSInteger i s l
     _ -> case (toDouble initObj, toDouble step, toDouble lim) of
-      (Just i, Just s, Just l) ->
-        loopWhile [push (PSReal n) >> evalProg code | n <- forRange i s l]
+      (Just i, Just s, Just l) -> runFor PSReal i s l
       _ -> error "Type error: for expected numbers and proc"
-  where
-    forRange curr s l
-      | (s > 0 && curr <= l) || (s < 0 && curr >= l) = curr : forRange (curr + s) s l
-      | otherwise = []
 
 -- 'loop': proc loop -> repeatedly executes proc until exit
 psLoop :: ([Object] -> Interpreter ()) -> Interpreter ()
 psLoop evalProg = do
   code <- toCode <$> pop
-  loopWhile (repeat (evalProg code))
+  let go = runLoopStep (evalProg code) go
+  go
 
 -- 'exit': exit -> breaks out of innermost enclosing loop
 psExit :: Interpreter ()

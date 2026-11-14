@@ -29,7 +29,6 @@ where
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State.Strict (gets, modify)
-import Data.Bits ((.&.))
 import PostScript.Environment (pop, push)
 import PostScript.Types
 import System.CPUTime (getCPUTime)
@@ -257,7 +256,7 @@ psCvr =
 psRand :: Interpreter ()
 psRand = do
   s <- gets randSeed
-  let next = (s * 1103515245 + 12345) .&. 0x7FFFFFFF
+  let next = (s * 1103515245 + 12345) `mod` 2147483648
   modify (\st -> st {randSeed = next})
   push (PSInteger next)
 
@@ -266,7 +265,7 @@ psSrand :: Interpreter ()
 psSrand = do
   seed <-
     pop >>= \case
-      PSInteger n -> return (n .&. 0x7FFFFFFF)
+      PSInteger n -> return (n `mod` 2147483648)
       _ -> error "typecheck: srand expected integer"
   modify (\st -> st {randSeed = seed})
 

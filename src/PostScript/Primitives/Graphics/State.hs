@@ -21,11 +21,12 @@ module PostScript.Primitives.Graphics.State
     psFill,
     psEofill,
     psClip,
+    psEoclip,
+    psInitclip,
     psShowpage,
   )
 where
 
-import Control.Monad (unless)
 import Control.Monad.State.Strict (get, gets, modify, put)
 import Data.Map.Strict qualified as Map
 import PostScript.Environment (modifyGState, pop, push)
@@ -34,10 +35,12 @@ import PostScript.Primitives.Graphics.Render
     renderStrokeToSVG,
   )
 import PostScript.Types
-  ( GraphicsState (..),
+  ( GraphicCommand (..),
+    GraphicsState (..),
     Interpreter,
     Object (..),
     PSState (..),
+    PathSegment (..),
   )
 
 -- Pop numeric value as Double
@@ -251,40 +254,54 @@ psSetdash = do
 
 -- Painting & rendering actions
 
--- 'stroke': draw outlines of currentPath to canvas and clear path
-psStroke :: Interpreter ()
-psStroke = do
+-- Helper for painting actions: records both SVG and internal GraphicCommand, then clears path
+recordDrawAction :: (GraphicsState -> [PathSegment] -> (String, GraphicCommand)) -> Interpreter ()
+recordDrawAction makeAction = do
   gs <- gets gState
   let path = reverse (currentPath gs)
-  unless (null path) $ do
-    let svgElem = renderStrokeToSVG gs path
-    modify (\s -> s {canvasElements = svgElem : canvasElements s})
+  if null path
+    then return ()
+    else do
+      let (svgElem, cmd) = makeAction gs path
+      modify $ \s ->
+        s
+          { canvasElements = svgElem : canvasElements s,
+            graphicCommands = cmd : graphicCommands s
+          }
   modifyGState (\s -> s {currentPath = [], currentPoint = Nothing})
+
+-- 'stroke': draw outlines of currentPath to canvas and clear path
+psStroke :: Interpreter ()
+psStroke = recordDrawAction $ \gs path ->
+  (renderStrokeToSVG gs path, DrawStroke gs path)
 
 -- 'fill': fill interior of currentPath (nonzero rule) and clear path
 psFill :: Interpreter ()
-psFill = do
-  gs <- gets gState
-  let path = reverse (currentPath gs)
-  unless (null path) $ do
-    let svgElem = renderFillToSVG gs False path
-    modify (\s -> s {canvasElements = svgElem : canvasElements s})
-  modifyGState (\s -> s {currentPath = [], currentPoint = Nothing})
+psFill = recordDrawAction $ \gs path ->
+  (renderFillToSVG gs False path, DrawFill gs False path)
 
 -- 'eofill': fill interior of currentPath (evenodd rule) and clear path
 psEofill :: Interpreter ()
-psEofill = do
-  gs <- gets gState
-  let path = reverse (currentPath gs)
-  unless (null path) $ do
-    let svgElem = renderFillToSVG gs True path
-    modify (\s -> s {canvasElements = svgElem : canvasElements s})
-  modifyGState (\s -> s {currentPath = [], currentPoint = Nothing})
+psEofill = recordDrawAction $ \gs path ->
+  (renderFillToSVG gs True path, DrawFill gs True path)
 
 -- 'clip': intersect clipping path with currentPath (path retained)
 psClip :: Interpreter ()
-psClip = return ()
+psClip = modifyGState $ \gs ->
+  case currentPath gs of
+    [] -> gs
+    segs -> gs {clipPath = Just (reverse segs)}
+
+-- 'eoclip': intersect clipping path with currentPath (evenodd rule, path retained)
+psEoclip :: Interpreter ()
+psEoclip = psClip
+
+-- 'initclip': reset clipping path to default page boundary
+psInitclip :: Interpreter ()
+psInitclip = modifyGState $ \gs -> gs {clipPath = Nothing}
 
 -- 'showpage': flush canvas to output and reset page
 psShowpage :: Interpreter ()
-psShowpage = modifyGState (\gs -> gs {currentPath = [], currentPoint = Nothing})
+psShowpage = do
+  modify (\s -> s {graphicCommands = DrawPage : graphicCommands s})
+  modifyGState (\gs -> gs {currentPath = [], currentPoint = Nothing})

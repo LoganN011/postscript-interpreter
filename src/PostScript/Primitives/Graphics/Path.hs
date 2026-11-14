@@ -15,6 +15,7 @@ module PostScript.Primitives.Graphics.Path
     psFlattenpath,
     psPathforall,
     psClippath,
+    psStrokepath,
   )
 where
 
@@ -167,31 +168,146 @@ psArc = addArc False
 psArcn :: Interpreter ()
 psArcn = addArc True
 
+-- Helper: subdivide arc into angular spans of at most 90 degrees
+arcAngleSpans :: Bool -> Double -> Double -> [(Double, Double)]
+arcAngleSpans False a1 a2 =
+  let diff = a2 - a1
+      sweep
+        | diff == 0.0 = 0.0
+        | diff > 0.0 =
+            let m = diff - fromIntegral (floor (diff / 360.0) :: Int) * 360.0
+             in if m == 0.0 then 360.0 else m
+        | otherwise =
+            let m = diff - fromIntegral (floor (diff / 360.0) :: Int) * 360.0
+             in if m == 0.0 then 360.0 else m
+      n = max 1 (ceiling (sweep / 90.0) :: Int)
+      step = sweep / fromIntegral n
+   in [ (a1 + fromIntegral i * step, a1 + fromIntegral (i + 1) * step)
+      | i <- [0 .. n - 1]
+      ]
+arcAngleSpans True a1 a2 =
+  let diff = a1 - a2
+      sweep
+        | diff == 0.0 = 0.0
+        | diff > 0.0 =
+            let m = diff - fromIntegral (floor (diff / 360.0) :: Int) * 360.0
+             in if m == 0.0 then 360.0 else m
+        | otherwise =
+            let m = diff - fromIntegral (floor (diff / 360.0) :: Int) * 360.0
+             in if m == 0.0 then 360.0 else m
+      n = max 1 (ceiling (sweep / 90.0) :: Int)
+      step = sweep / fromIntegral n
+   in [ (a1 - fromIntegral i * step, a1 - fromIntegral (i + 1) * step)
+      | i <- [0 .. n - 1]
+      ]
+
 addArc :: Bool -> Interpreter ()
 addArc isClockwise = do
   a2 <- popNum
   a1 <- popNum
   r <- popNum
-  (x, y) <- popPoint
+  (cx, cy) <- popPoint
   gs <- gets gState
   let m = ctm gs
-      (rad1, rad2) = (a1 * pi / 180.0, a2 * pi / 180.0)
-      startD = transformPoint m (x + r * cos rad1, y + r * sin rad1)
-      endD = transformPoint m (x + r * cos rad2, y + r * sin rad2)
-      centerD = transformPoint m (x, y)
-      (a, b, c, d, _, _) = m
-      rScale = sqrt (abs (a * d - b * c))
-      arcSeg = (if isClockwise then ArcN else Arc) (fst centerD) (snd centerD) (r * rScale) a1 a2
+      spans = arcAngleSpans isClockwise a1 a2
+      firstAngle = case spans of (s : _) -> fst s; [] -> a1
+      radStart = firstAngle * pi / 180.0
+      startD = transformPoint m (cx + r * cos radStart, cy + r * sin radStart)
       leadSeg = case currentPoint gs of
         Nothing -> [MoveTo (fst startD) (snd startD)]
-        Just _ -> [LineTo (fst startD) (snd startD)]
+        Just ptD
+          | abs (fst ptD - fst startD) < 1e-4 && abs (snd ptD - snd startD) < 1e-4 -> []
+          | otherwise -> [LineTo (fst startD) (snd startD)]
+
+      spanToCurve (phi1Deg, phi2Deg) =
+        let rad1 = phi1Deg * pi / 180.0
+            rad2 = phi2Deg * pi / 180.0
+            deltaRad = rad2 - rad1
+            k = (4.0 / 3.0) * tan (deltaRad / 4.0)
+            p0 = (cx + r * cos rad1, cy + r * sin rad1)
+            p3 = (cx + r * cos rad2, cy + r * sin rad2)
+            p1 = (fst p0 - k * r * sin rad1, snd p0 + k * r * cos rad1)
+            p2 = (fst p3 + k * r * sin rad2, snd p3 - k * r * cos rad2)
+            p1D = transformPoint m p1
+            p2D = transformPoint m p2
+            p3D = transformPoint m p3
+         in (CurveTo (fst p1D) (snd p1D) (fst p2D) (snd p2D) (fst p3D) (snd p3D), p3D)
+
+      curvesAndEnds = map spanToCurve spans
+      curveSegs = map fst curvesAndEnds
+      finalPtD = if null curvesAndEnds then startD else snd (last curvesAndEnds)
+
   modifyGState
     ( \s ->
         s
-          { currentPath = arcSeg : (leadSeg ++ currentPath s),
-            currentPoint = Just endD
+          { currentPath = reverse curveSegs ++ leadSeg ++ currentPath s,
+            currentPoint = Just finalPtD
           }
     )
+
+-- 'strokepath': - -> - (replaces current path with stroked outline polygons)
+psStrokepath :: Interpreter ()
+psStrokepath = modifyGState $ \gs ->
+  let segs = reverse (currentPath gs)
+      subpaths = extractSubpaths segs
+      hw = max 0.5 (lineWidth gs / 2.0)
+      join = lineJoin gs
+      cap = lineCap gs
+      quadSegs (p1, p2) =
+        let dx = fst p2 - fst p1
+            dy = snd p2 - snd p1
+            len = sqrt (dx * dx + dy * dy)
+         in if len < 1e-6
+              then []
+              else
+                let nx = (-dy / len) * hw
+                    ny = (dx / len) * hw
+                 in [ MoveTo (fst p1 - nx) (snd p1 - ny),
+                      LineTo (fst p2 - nx) (snd p2 - ny),
+                      LineTo (fst p2 + nx) (snd p2 + ny),
+                      LineTo (fst p1 + nx) (snd p1 + ny),
+                      ClosePath
+                    ]
+      diskPoly pt =
+        let pts =
+              [ ( fst pt + hw * cos (fromIntegral i * pi / 6.0),
+                  snd pt + hw * sin (fromIntegral i * pi / 6.0)
+                )
+                | i <- [0 .. 11 :: Int]
+              ]
+         in case pts of
+              (d0 : drest) -> MoveTo (fst d0) (snd d0) : [LineTo (fst p) (snd p) | p <- drest] ++ [ClosePath]
+              [] -> []
+      strokeSubpath (p0 : prest@(_ : _)) =
+        let pts = p0 : prest
+            segQuads = concatMap quadSegs (zip pts prest)
+            jointDisks =
+              if join == 1 && length pts > 2
+                then concatMap diskPoly (init prest)
+                else []
+            endDisks =
+              if cap == 1 && p0 /= last prest
+                then diskPoly p0 ++ diskPoly (last prest)
+                else []
+         in segQuads ++ jointDisks ++ endDisks
+      strokeSubpath _ = []
+      strokedOutlines = concatMap strokeSubpath subpaths
+   in if null strokedOutlines
+        then gs
+        else gs {currentPath = reverse strokedOutlines}
+
+-- | Subdivide segments into continuous coordinate subpaths
+extractSubpaths :: [PathSegment] -> [[(Double, Double)]]
+extractSubpaths = go [] [] (0.0, 0.0) (0.0, 0.0)
+  where
+    finishSub curr acc = if null curr then acc else reverse curr : acc
+    go curr acc _ _ [] = reverse (finishSub curr acc)
+    go curr acc _ _ (MoveTo x y : rest) = go [(x, y)] (finishSub curr acc) (x, y) (x, y) rest
+    go curr acc _ s (LineTo x y : rest) = go ((x, y) : curr) acc (x, y) s rest
+    go curr acc _ s (ClosePath : rest) = go (s : curr) acc s s rest
+    go curr acc _ s (CurveTo _ _ _ _ x3 y3 : rest) = go ((x3, y3) : curr) acc (x3, y3) s rest
+    go curr acc _ s (Arc cx cy r _ _ : rest) = go ((cx + r, cy) : curr) acc (cx + r, cy) s rest
+    go curr acc _ s (ArcN cx cy r _ _ : rest) = go ((cx + r, cy) : curr) acc (cx + r, cy) s rest
 
 -- 'arcto': x1 y1 x2 y2 r arcto -> tangent arc, leaves tangent points on stack
 psArcto :: Interpreter ()
@@ -337,16 +453,19 @@ sampleArcPts isClockwise n cx cy r a1 a2 =
       | i <- [1 .. n]
       ]
 
--- 'clippath': -> (sets current path to default clipping boundary rectangle [0, 0, 612, 792])
+-- 'clippath': -> (sets current path to clipping boundary)
 psClippath :: Interpreter ()
 psClippath = modifyGState $ \gs ->
-  gs
-    { currentPath =
-        [ ClosePath,
-          LineTo 0.0 792.0,
-          LineTo 612.0 792.0,
-          LineTo 612.0 0.0,
-          MoveTo 0.0 0.0
-        ],
-      currentPoint = Just (0.0, 792.0)
-    }
+  case clipPath gs of
+    Just segs -> gs {currentPath = reverse segs, currentPoint = Nothing}
+    Nothing ->
+      gs
+        { currentPath =
+            [ ClosePath,
+              LineTo 0.0 792.0,
+              LineTo 612.0 792.0,
+              LineTo 612.0 0.0,
+              MoveTo 0.0 0.0
+            ],
+          currentPoint = Just (0.0, 792.0)
+        }

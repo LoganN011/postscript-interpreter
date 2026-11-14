@@ -8,9 +8,9 @@ module PostScript.Evaluator
 where
 
 import Control.Exception (SomeException, displayException, try)
-import Control.Monad (unless)
-import Control.Monad.State.Strict (execStateT, gets)
+import Control.Monad.State.Strict (execStateT, get)
 import PostScript.Environment (lookupDict, pop, push)
+import PostScript.Lexer (parseOneToken)
 import PostScript.Primitives.Control
   ( psAnd,
     psBind,
@@ -67,6 +67,7 @@ import PostScript.Primitives.Graphics.Path
     psRcurveto,
     psRlineto,
     psRmoveto,
+    psStrokepath,
   )
 import PostScript.Primitives.Graphics.State
   ( psClip,
@@ -74,11 +75,13 @@ import PostScript.Primitives.Graphics.State
     psCurrentlinewidth,
     psCurrentmiterlimit,
     psCurrentrgbcolor,
+    psEoclip,
     psEofill,
     psFill,
     psGrestore,
     psGrestoreall,
     psGsave,
+    psInitclip,
     psRestore,
     psSave,
     psSetcmykcolor,
@@ -92,6 +95,21 @@ import PostScript.Primitives.Graphics.State
     psSetrgbcolor,
     psShowpage,
     psStroke,
+  )
+import PostScript.Primitives.Graphics.Text
+  ( psAshow,
+    psAwidthshow,
+    psCharpath,
+    psCurrentfont,
+    psDefinefont,
+    psFindfont,
+    psKshow,
+    psMakefont,
+    psScalefont,
+    psSetfont,
+    psShow,
+    psStringwidth,
+    psWidthshow,
   )
 import PostScript.Primitives.Graphics.Transform
   ( psConcat,
@@ -111,7 +129,6 @@ import PostScript.Primitives.Graphics.Transform
     psTransform,
     psTranslate,
   )
-import PostScript.Lexer (parseOneToken)
 import PostScript.Primitives.Math
   ( psAbs,
     psAdd,
@@ -151,8 +168,8 @@ import PostScript.Primitives.Stack
     psCountToMark,
     psCvlit,
     psCvn,
-    psCvs,
     psCvrs,
+    psCvs,
     psCvx,
     psDup,
     psEndArray,
@@ -183,13 +200,12 @@ import PostScript.Types (Interpreter, Object (..), PSState (..), defaultSystemDi
 evalProgram :: [Object] -> Interpreter ()
 evalProgram [] = return ()
 evalProgram (x : xs) = do
-  term <- gets executionTerminated
-  ex <- gets loopExited
-  unless (term || ex) $ do
-    evalObject x
-    term' <- gets executionTerminated
-    ex' <- gets loopExited
-    unless (term' || ex') (evalProgram xs)
+  s <- get
+  if executionTerminated s || loopExited s
+    then return ()
+    else do
+      evalObject x
+      evalProgram xs
 
 -- Evaluates a single PostScript object according to PostScript semantics
 evalObject :: Object -> Interpreter ()
@@ -370,7 +386,25 @@ executeBuiltin name = case name of
   "fill" -> psFill
   "eofill" -> psEofill
   "clip" -> psClip
+  "eoclip" -> psEoclip
+  "initclip" -> psInitclip
+  "clippath" -> psClippath
+  "strokepath" -> psStrokepath
   "showpage" -> psShowpage
+  -- Font & Text Primitives
+  "findfont" -> psFindfont
+  "scalefont" -> psScalefont
+  "setfont" -> psSetfont
+  "currentfont" -> psCurrentfont
+  "show" -> psShow
+  "ashow" -> psAshow
+  "widthshow" -> psWidthshow
+  "awidthshow" -> psAwidthshow
+  "kshow" -> psKshow evalProgram
+  "stringwidth" -> psStringwidth
+  "charpath" -> psCharpath
+  "makefont" -> psMakefont
+  "definefont" -> psDefinefont
   -- Unknown / Undefined
   _ -> error ("Undefined symbol: " ++ name)
 
