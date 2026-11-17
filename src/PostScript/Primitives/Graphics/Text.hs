@@ -17,6 +17,7 @@ where
 
 import Control.Monad (when)
 import Control.Monad.State.Strict (gets, modify)
+import Data.List (foldl')
 import Data.Map.Strict qualified as Map
 import PostScript.Environment (defineSymbol, lookupDict, modifyGState, newDict, pop, push)
 import PostScript.Primitives.Graphics.Render (renderTextToSVG)

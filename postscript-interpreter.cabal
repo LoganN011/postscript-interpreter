@@ -53,6 +53,8 @@ extra-doc-files:    CHANGELOG.md
 
 common warnings
     ghc-options: -Wall -O2
+    default-extensions:
+        LambdaCase
 
 
 library
@@ -78,11 +80,11 @@ library
         containers,
         mtl,
         megaparsec
-    default-language: GHC2024
+    default-language: GHC2021
 
 test-suite postscript-interpreter-test
     import:           warnings
-    default-language: GHC2024
+    default-language: GHC2021
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Spec.hs
@@ -111,7 +113,7 @@ executable postscript-interpreter
 
     -- Other library packages from which modules are imported.
     build-depends:    
-        base ^>=4.20.2.0,
+        base >= 4.14 && < 5,
         directory,
         filepath,
         postscript-interpreter
@@ -119,7 +121,7 @@ executable postscript-interpreter
     hs-source-dirs:   app
 
     -- Base language which the package is written in.
-    default-language: GHC2024
+    default-language: GHC2021
 
 executable postscript-gui
     import:           warnings
@@ -142,4 +144,4 @@ executable postscript-gui
         filepath,
         directory,
         process
-    default-language: GHC2024
+    default-language: GHC2021
