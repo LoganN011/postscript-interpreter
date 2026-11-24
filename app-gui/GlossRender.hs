@@ -6,6 +6,7 @@ module GlossRender
   )
 where
 
+import Data.List (isInfixOf, sort)
 import Graphics.Gloss hiding (Arc)
 import PostScript.Types
   ( GraphicCommand (..),
@@ -88,11 +89,12 @@ renderStroke gs segs =
       col = psColorToGloss (rgbColor gs)
       (a, b, c, d, _, _) = ctm gs
       scaleFactor = sqrt (abs (a * d - b * c))
-      effW = realToFrac (lineWidth gs * if scaleFactor == 0 then 1.0 else scaleFactor)
+      effScale = if scaleFactor == 0 then 1.0 else scaleFactor
+      effW = realToFrac (lineWidth gs * effScale)
       cap = lineCap gs
       join = lineJoin gs
-      dashes = dashArray gs
-      dOffset = dashOffset gs
+      dashes = map (* effScale) (dashArray gs)
+      dOffset = dashOffset gs * effScale
 
       mkPath pts
         | length pts < 2 = Blank
@@ -279,7 +281,7 @@ renderFill gs segs =
                   h = maximum ys - minimum ys
                in w >= 250 && h >= 200
 
--- | Render vector text, checking clip bounds when active and with dense overdraw for solid glyphs
+-- | Render vector text, clipping stroke segments to clipPath when active
 renderText :: GraphicsState -> (Double, Double) -> String -> Picture
 renderText gs pt txt =
   let mClipPolys = case clipPath gs of
@@ -288,29 +290,96 @@ renderText gs pt txt =
               Just [map toGlossPoint sp | sp <- segmentsToSubpaths cSegs, length sp >= 3]
         _ -> Nothing
    in case mClipPolys of
-        Just polys ->
-          let (a, b, _, _, _, _) = ctm gs
-              sx = sqrt (a * a + b * b)
-              advW = realToFrac (fontSize gs * 0.55 * if sx == 0 then 1.0 else sx)
-              rotDeg = realToFrac (atan2 b a * 180.0 / pi)
-              rotRad = rotDeg * pi / 180.0
-              (gx, gy) = toGlossPoint pt
-              charPics =
-                [ Translate
-                    (fromIntegral (i :: Int) * advW * cos rotRad)
-                    (fromIntegral (i :: Int) * advW * sin rotRad)
-                    (renderOneChar gs (gx, gy) rotDeg [c])
-                | (i, c) <- zip [0 ..] txt,
-                  let cx = gx + (fromIntegral (i :: Int) + 0.5) * advW * cos rotRad
-                      cy = gy + (fromIntegral (i :: Int) + 0.5) * advW * sin rotRad,
-                  isPointInClipPolys (cx, cy) polys
-                ]
-           in Pictures charPics
+        Just polys -> renderClippedText gs pt txt polys
         Nothing ->
           let (gx, gy) = toGlossPoint pt
               (a, b, _, _, _, _) = ctm gs
               rotDeg = realToFrac (atan2 b a * 180.0 / pi)
            in renderOneChar gs (gx, gy) rotDeg txt
+
+-- | Render text using vector stroke polylines clipped against clip polygons
+renderClippedText :: GraphicsState -> (Double, Double) -> String -> [[Point]] -> Picture
+renderClippedText gs (px, py) txt polys =
+  let col = psColorToGloss (rgbColor gs)
+      sz = fontSize gs
+      (a, b, c, d, _, _) = ctm gs
+      sx = sqrt (a * a + b * b)
+      sy = sqrt (c * c + d * d)
+      effScale = max 1e-3 ((if sx == 0 then 1.0 else sx + if sy == 0 then 1.0 else sy) * 0.5)
+      strokeW = max 0.8 (realToFrac (abs sz * effScale * 0.085))
+      isItalic = "Italic" `isInfixOf` fontName gs || "Oblique" `isInfixOf` fontName gs
+      toDev (lx, ly) =
+        let lx' = if isItalic then lx + 0.22 * ly else lx
+            dx = lx' * sz
+            dy = ly * sz
+         in toGlossPoint (px + a * dx + c * dy, py + b * dx + d * dy)
+      buildChar (curX, acc) ch =
+        let (adv, strokes) = charStrokes ch
+            segs =
+              [ (toDev (curX + x1, y1), toDev (curX + x2, y2))
+              | poly <- strokes,
+                ((x1, y1), (x2, y2)) <- zip poly (drop 1 poly)
+              ]
+         in (curX + adv, acc ++ segs)
+      (_, allSegs) = foldl buildChar (0.0, []) txt
+      clippedSegs = concatMap (uncurry (clipSegmentToPolys polys)) allSegs
+      pics = [renderThickSubpath strokeW 1 1 [q1, q2] | (q1, q2) <- clippedSegs]
+   in Color col (Pictures pics)
+
+-- | Compute intersection parameter t in (0, 1) between two 2D line segments
+segmentIntersectT :: Point -> Point -> Point -> Point -> Maybe Float
+segmentIntersectT (x1, y1) (x2, y2) (x3, y3) (x4, y4) =
+  let dx1 = x2 - x1
+      dy1 = y2 - y1
+      dx2 = x4 - x3
+      dy2 = y4 - y3
+      denom = dx1 * dy2 - dy1 * dx2
+   in if abs denom < 1e-6
+        then Nothing
+        else
+          let t = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / denom
+              u = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / denom
+           in if t > 1e-4 && t < 1.0 - 1e-4 && u >= -1e-4 && u <= 1.0 + 1e-4
+                then Just t
+                else Nothing
+
+-- | Clip a line segment against a list of polygons, keeping sub-segments inside any polygon
+clipSegmentToPolys :: [[Point]] -> Point -> Point -> [(Point, Point)]
+clipSegmentToPolys polys p1@(x1, y1) p2@(x2, y2) =
+  let edges = concatMap (\poly -> zip poly (drop 1 poly ++ take 1 poly)) polys
+      ts =
+        sort $
+          0.0
+            : 1.0
+            : [ t
+              | (q1, q2) <- edges,
+                Just t <- [segmentIntersectT p1 p2 q1 q2]
+              ]
+      pairs = zip ts (drop 1 ts)
+      lerp t = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+   in [ (lerp t0, lerp t1)
+      | (t0, t1) <- pairs,
+        t1 - t0 > 1e-4,
+        let tm = (t0 + t1) * 0.5,
+        isPointInClipPolys (lerp tm) polys
+      ]
+
+-- | Minimal normalized vector stroke font (baseline 0.0, cap 0.72) for clipped text rendering
+charStrokes :: Char -> (Double, [[(Double, Double)]])
+charStrokes ' ' = (0.30, [])
+charStrokes 'H' = (0.65, [[(0.08, 0.0), (0.08, 0.72)], [(0.57, 0.0), (0.57, 0.72)], [(0.08, 0.36), (0.57, 0.36)]])
+charStrokes 'e' = (0.52, [[(0.06, 0.25), (0.46, 0.25), (0.44, 0.38), (0.34, 0.48), (0.18, 0.48), (0.08, 0.38), (0.06, 0.22), (0.08, 0.10), (0.18, 0.0), (0.36, 0.0), (0.44, 0.08)]])
+charStrokes 'l' = (0.26, [[(0.13, 0.72), (0.13, 0.05), (0.18, 0.0), (0.22, 0.0)]])
+charStrokes 'o' = (0.54, [[(0.27, 0.48), (0.14, 0.48), (0.06, 0.36), (0.06, 0.12), (0.14, 0.0), (0.40, 0.0), (0.48, 0.12), (0.48, 0.36), (0.40, 0.48), (0.27, 0.48)]])
+charStrokes 'T' = (0.60, [[(0.04, 0.72), (0.56, 0.72)], [(0.30, 0.72), (0.30, 0.0)]])
+charStrokes 't' = (0.36, [[(0.16, 0.70), (0.16, 0.08), (0.22, 0.0), (0.30, 0.0)], [(0.04, 0.48), (0.28, 0.48)]])
+charStrokes 'X' = (0.62, [[(0.06, 0.72), (0.56, 0.0)], [(0.56, 0.72), (0.06, 0.0)]])
+charStrokes 'x' = (0.50, [[(0.06, 0.48), (0.44, 0.0)], [(0.44, 0.48), (0.06, 0.0)]])
+charStrokes 'i' = (0.26, [[(0.13, 0.48), (0.13, 0.0)], [(0.13, 0.64), (0.13, 0.68)]])
+charStrokes 's' = (0.48, [[(0.42, 0.40), (0.34, 0.48), (0.16, 0.48), (0.08, 0.40), (0.10, 0.30), (0.38, 0.22), (0.42, 0.10), (0.34, 0.0), (0.14, 0.0), (0.06, 0.08)]])
+charStrokes 'h' = (0.54, [[(0.08, 0.72), (0.08, 0.0)], [(0.08, 0.36), (0.18, 0.48), (0.36, 0.48), (0.46, 0.38), (0.46, 0.0)]])
+charStrokes 'a' = (0.52, [[(0.10, 0.40), (0.20, 0.48), (0.36, 0.48), (0.44, 0.38), (0.44, 0.0)], [(0.44, 0.24), (0.16, 0.24), (0.06, 0.14), (0.08, 0.04), (0.20, 0.0), (0.36, 0.0), (0.44, 0.08)]])
+charStrokes _ = (0.52, [[(0.08, 0.0), (0.08, 0.68), (0.44, 0.68), (0.44, 0.0), (0.08, 0.0)]])
 
 -- | Helper to test whether a point is inside any clip polygon
 isPointInClipPolys :: Point -> [[Point]] -> Bool
@@ -331,22 +400,23 @@ renderOneChar gs (gx, gy) rotDeg str =
       (a, b, c, d, _, _) = ctm gs
       sx = sqrt (a * a + b * b)
       sy = sqrt (c * c + d * d)
+      det = a * d - b * c
       scaleX = if sx == 0 then 1.0 else sx
-      scaleY = if sy == 0 then 1.0 else sy
+      scaleY = (if sy == 0 then 1.0 else sy) * (if det < 0 then -1.0 else 1.0)
       sBase = realToFrac (fontSize gs) * 0.007
       textPic = Scale (sBase * realToFrac scaleX) (sBase * realToFrac scaleY) $ Text str
-      effSize = fontSize gs * realToFrac scaleY
+      effSize = abs (fontSize gs) * abs scaleY
       stemR = max 0.0 (realToFrac effSize * 0.045)
       boldPic =
         if stemR <= 0.35
           then textPic
           else
-            let step = 0.55
+            let step = max 0.55 (stemR / 3.0)
                 steps = [-stemR, -stemR + step .. stemR]
                 offsets = [(dx, dy) | dx <- steps, dy <- steps, dx * dx + dy * dy <= stemR * stemR]
              in Pictures [Translate dx dy textPic | (dx, dy) <- offsets]
       rotPic = if abs rotDeg > 0.01 then Rotate (-rotDeg) boldPic else boldPic
-   in if isInsideRect (-pageHalfW - 50) (pageHalfW + 50) (-pageHalfH - 50) (pageHalfH + 50) (gx, gy)
+   in if isInsideRect (-pageHalfW - 200) (pageHalfW + 200) (-pageHalfH - 200) (pageHalfH + 200) (gx, gy)
         then Color col $ Translate gx gy rotPic
         else Blank
 

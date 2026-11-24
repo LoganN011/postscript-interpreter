@@ -10,6 +10,7 @@ module PostScript.Primitives.Graphics.Render
   )
 where
 
+import Data.List (foldl', isInfixOf)
 import PostScript.Types (GraphicCommand (..), GraphicsState (..), PathSegment (..))
 
 -- Format number cleanly without unnecessary trailing decimals
@@ -58,12 +59,38 @@ joinComma [] = ""
 joinComma [x] = x
 joinComma (x : xs) = x ++ "," ++ joinComma xs
 
+-- Deterministic hash for SVG clipPath IDs
+hashString :: String -> Int
+hashString = foldl' (\h ch -> (h * 31 + fromEnum ch) `mod` 1000000007) 5381
+
+-- Wrap an SVG element with a clipPath when GraphicsState has an active clipPath
+wrapWithClip :: GraphicsState -> String -> String
+wrapWithClip gs elemStr =
+  case clipPath gs of
+    Just cSegs
+      | not (null cSegs) ->
+          let dClip = renderPathToSVG cSegs
+              cid = "clip_" ++ show (abs (hashString dClip))
+           in "<g><clipPath id=\""
+                ++ cid
+                ++ "\"><path d=\""
+                ++ dClip
+                ++ "\" /></clipPath><g clip-path=\"url(#"
+                ++ cid
+                ++ ")\">"
+                ++ elemStr
+                ++ "</g></g>"
+    _ -> elemStr
+
 -- Format stroke attributes (color, width, dash, cap, join)
 renderStrokeToSVG :: GraphicsState -> [PathSegment] -> String
 renderStrokeToSVG gs segs =
   let dAttr = renderPathToSVG segs
       color = fmtRGB (rgbColor gs)
-      w = fmtD (if lineWidth gs <= 0 then 1.0 else lineWidth gs)
+      (a, b, c, d, _, _) = ctm gs
+      detScale = sqrt (abs (a * d - b * c))
+      scaleFactor = if detScale == 0 then 1.0 else detScale
+      w = fmtD (if lineWidth gs <= 0 then 1.0 else lineWidth gs * scaleFactor)
       cap = case lineCap gs of
         1 -> "round"
         2 -> "square"
@@ -76,29 +103,32 @@ renderStrokeToSVG gs segs =
         if lineJoin gs == 0 && miterLimit gs /= 4.0
           then " stroke-miterlimit=\"" ++ fmtD (miterLimit gs) ++ "\""
           else ""
+      effDashes = map (* scaleFactor) (dashArray gs)
+      effOffset = dashOffset gs * scaleFactor
       dashAttr =
-        if null (dashArray gs)
+        if null effDashes
           then ""
-          else " stroke-dasharray=\"" ++ joinComma (map fmtD (dashArray gs)) ++ "\""
+          else " stroke-dasharray=\"" ++ joinComma (map fmtD effDashes) ++ "\""
       dashOffsetAttr =
-        if dashOffset gs == 0.0
+        if effOffset == 0.0
           then ""
-          else " stroke-dashoffset=\"" ++ fmtD (dashOffset gs) ++ "\""
-   in "<path d=\""
-        ++ dAttr
-        ++ "\" fill=\"none\" stroke=\""
-        ++ color
-        ++ "\" stroke-width=\""
-        ++ w
-        ++ "\" stroke-linecap=\""
-        ++ cap
-        ++ "\" stroke-linejoin=\""
-        ++ join
-        ++ "\""
-        ++ miterAttr
-        ++ dashAttr
-        ++ dashOffsetAttr
-        ++ " />"
+          else " stroke-dashoffset=\"" ++ fmtD effOffset ++ "\""
+   in wrapWithClip gs $
+        "<path d=\""
+          ++ dAttr
+          ++ "\" fill=\"none\" stroke=\""
+          ++ color
+          ++ "\" stroke-width=\""
+          ++ w
+          ++ "\" stroke-linecap=\""
+          ++ cap
+          ++ "\" stroke-linejoin=\""
+          ++ join
+          ++ "\""
+          ++ miterAttr
+          ++ dashAttr
+          ++ dashOffsetAttr
+          ++ " />"
 
 -- Format fill attributes (color, fill-rule)
 renderFillToSVG :: GraphicsState -> Bool -> [PathSegment] -> String
@@ -106,7 +136,8 @@ renderFillToSVG gs isEvenOdd segs =
   let dAttr = renderPathToSVG segs
       color = fmtRGB (rgbColor gs)
       ruleAttr = if isEvenOdd then " fill-rule=\"evenodd\"" else ""
-   in "<path d=\"" ++ dAttr ++ "\" fill=\"" ++ color ++ "\"" ++ ruleAttr ++ " stroke=\"none\" />"
+   in wrapWithClip gs $
+        "<path d=\"" ++ dAttr ++ "\" fill=\"" ++ color ++ "\"" ++ ruleAttr ++ " stroke=\"none\" />"
 
 -- Escape text for XML/SVG
 escapeXML :: String -> String
@@ -123,20 +154,47 @@ renderTextToSVG :: GraphicsState -> (Double, Double) -> String -> String
 renderTextToSVG gs (x, y) text =
   let color = fmtRGB (rgbColor gs)
       fName = fontName gs
-      fSize = fmtD (fontSize gs)
-   in "<text x=\""
-        ++ fmtD x
-        ++ "\" y=\""
-        ++ fmtD y
-        ++ "\" font-family=\""
-        ++ fName
-        ++ "\" font-size=\""
-        ++ fSize
-        ++ "\" fill=\""
-        ++ color
-        ++ "\">"
-        ++ escapeXML text
-        ++ "</text>"
+      rawSize = fontSize gs
+      fSize = abs rawSize
+      sgn = if rawSize < 0 then -1.0 else 1.0
+      (a, b, c, d, _, _) = ctm gs
+      transformAttr =
+        " transform=\"matrix("
+          ++ fmtD (a * sgn)
+          ++ ", "
+          ++ fmtD (b * sgn)
+          ++ ", "
+          ++ fmtD (-c * sgn)
+          ++ ", "
+          ++ fmtD (-d * sgn)
+          ++ ", "
+          ++ fmtD x
+          ++ ", "
+          ++ fmtD y
+          ++ ")\""
+      styleAttr =
+        if "Italic" `isInfixOf` fName || "Oblique" `isInfixOf` fName
+          then " font-style=\"italic\""
+          else ""
+      weightAttr =
+        if "Bold" `isInfixOf` fName
+          then " font-weight=\"bold\""
+          else ""
+   in wrapWithClip gs $
+        "<text x=\"0\" y=\"0\""
+          ++ transformAttr
+          ++ " font-family=\""
+          ++ escapeXML fName
+          ++ "\" font-size=\""
+          ++ fmtD fSize
+          ++ "\""
+          ++ styleAttr
+          ++ weightAttr
+          ++ " fill=\""
+          ++ color
+          ++ "\">"
+          ++ escapeXML text
+          ++ "</text>"
 
 -- Wrap canvas elements in root SVG tag with Y-axis inversion
 generateSVGDocument :: Double -> Double -> [String] -> String
