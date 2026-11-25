@@ -86,7 +86,7 @@ writePages target baseName [singlePage] = do
       (dir, _) = splitFileName finalPath
   createDirectoryIfMissing True dir
   writeFile finalPath singlePage
-writePages target baseName pages@(firstPage : _) = do
+writePages target baseName pages = do
   isDir <- doesDirectoryExist target
   let isSvgFile = not isDir && takeExtension target == ".svg"
       outBase = if isSvgFile then dropExtension target else target </> baseName
@@ -95,7 +95,3 @@ writePages target baseName pages@(firstPage : _) = do
   forM_ (zip [1 :: Int ..] pages) $ \(idx, pageSvg) -> do
     let pagePath = outBase ++ "_" ++ show idx ++ ".svg"
     writeFile pagePath pageSvg
-  -- Also write the base target as page 1 if a specific .svg filename was requested
-  if isSvgFile
-    then writeFile target firstPage
-    else pure ()
