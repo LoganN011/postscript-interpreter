@@ -90,7 +90,7 @@ renderStroke gs segs =
       (a, b, c, d, _, _) = ctm gs
       scaleFactor = sqrt (abs (a * d - b * c))
       effScale = if scaleFactor == 0 then 1.0 else scaleFactor
-      effW = realToFrac (lineWidth gs * effScale)
+      effW = realToFrac (if lineWidth gs <= 0 then 1.0 else lineWidth gs * effScale)
       cap = lineCap gs
       join = lineJoin gs
       dashes = map (* effScale) (dashArray gs)
@@ -108,15 +108,35 @@ renderStroke gs segs =
 
 -- | Render a subpath with given line width, line cap, and line join
 renderSubpath :: Float -> Int -> Int -> [Point] -> Picture
-renderSubpath effW cap join pts
-  | length pts < 2 = Blank
-  | effW <= 1.0 =
-      let linePic = renderClippedLines pts
-          caps = case (cap, pts) of
-            (1, p0 : _) -> [renderDisk (effW / 2.0) p0, renderDisk (effW / 2.0) (last pts)]
-            _ -> []
-       in Pictures (linePic : caps)
-  | otherwise = renderThickSubpath effW cap join pts
+renderSubpath effW cap join pts = case pts of
+  [] -> Blank
+  [_] -> Blank
+  [p0@(x0, y0), (x1, y1)]
+    | effW <= 1.0 && (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0) < 0.25 ->
+        if cap == 1 || cap == 2
+          then renderPixelDot (max 0.55 (effW / 2.0)) p0
+          else renderClippedLines pts
+  (p0 : _)
+    | effW <= 1.0 ->
+        let linePic = renderClippedLines pts
+            caps =
+              if cap == 1 || cap == 2
+                then [renderPixelDot (max 0.5 (effW / 2.0)) p0, renderPixelDot (max 0.5 (effW / 2.0)) (last pts)]
+                else []
+         in Pictures (linePic : caps)
+    | otherwise -> renderThickSubpath effW cap join pts
+
+-- | Render a crisp 1px-minimum dot as a 4-vertex quad, clipped to page bounds
+renderPixelDot :: Float -> Point -> Picture
+renderPixelDot hw pt@(x, y)
+  | not (isInsideRect (-pageHalfW) pageHalfW (-pageHalfH) pageHalfH pt) = Blank
+  | otherwise =
+      Polygon
+        [ (x - hw, y - hw),
+          (x + hw, y - hw),
+          (x + hw, y + hw),
+          (x - hw, y + hw)
+        ]
 
 -- | Render a zero-length dash dot for round (1) or square (2) line caps
 renderDot :: Float -> Int -> Point -> Picture
